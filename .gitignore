@@ -1,4 +1,5 @@
 /target
+/.vscode
 Cargo.lock
 config.json
 private-key.pem
