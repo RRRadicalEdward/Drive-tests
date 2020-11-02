@@ -13,7 +13,11 @@ edition = "2018"
 anyhow = "1.0.33"
 rocket = "0.4.5"
 diesel = "1.4"
-
+log = "0.4.11"
+simple_logger = "1.11.0"
+serde_json = "1.0"
+rsa = "0.3.0"
+rand = "0.7.3"
 
 [dependencies.rocket_contrib]
 version = "0.4.5"

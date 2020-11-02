@@ -1,3 +1,0 @@
-/*[global.databases]
-postgres_db = { url = "/path/to/database.sqlite" }
-*/
