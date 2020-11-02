@@ -1,14 +1,23 @@
-//use diesel::pg::PgConnection;
-use anyhow::Context;
-use diesel::mysql::MysqlConnection;
-use diesel::prelude::Connection;
-fn main() {
-    let _db = extablish_connection();
-}
+use log::{error, info};
+use simple_logger::SimpleLogger;
 
+use driving_tests_site::db;
 
-pub fn extablish_connection() -> MysqlConnection {
-    let database_url = "mysql://root:sashayusuk@127.0.0.1:3306/world";
+fn main() -> anyhow::Result<()> {
+    SimpleLogger::new().init().unwrap();
 
-    MysqlConnection::establish(&database_url).context("Failed to connect to MySql data base").unwrap()
+    let db = db::extablish_connection();
+
+    let _db = match db {
+        Ok(db) => db,
+        Err(err) => {
+            error!("Failed to connect to the DataBase due to: {:?}", err);
+            return Err(err.into());
+        }
+    };
+
+    info!("Successfully connected to the DataBAse");
+
+    db::registary_new_user("Sasha", "Yusuk", "mypassword")?;
+    Ok(())
 }
