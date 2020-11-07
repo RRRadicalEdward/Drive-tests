@@ -1,5 +1,6 @@
 /target
 /.vscode
+.env
 Cargo.lock
 config.json
 private-key.pem
