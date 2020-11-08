@@ -147,3 +147,27 @@ fn decrypt_password(encrypted_password_hex: String) -> anyhow::Result<String> {
 
     Ok(decrypted_password)
 }
+
+pub fn verify_password(
+    user_name: &str,
+    user_second_name: &str,
+    user_password: String,
+) -> anyhow::Result<(bool, i32)> {
+    use self::users::dsl::*;
+    let db = Arc::clone(&DB);
+    let db = db.lock().unwrap();
+
+    let selected_user: model::User = users
+        .order(id)
+        .filter((name.eq(user_name)).and(second_name.eq(user_second_name)))
+        .first::<model::User>(db.as_ref().unwrap())
+        .map_err(|err| anyhow!("failed to find in the DB User - {}", err))?;
+
+    let decrypted_password = decrypt_password(selected_user.password)?;
+
+    if decrypted_password == user_password {
+        Ok((true, selected_user.scores))
+    } else {
+        Ok((false, 0))
+    }
+}

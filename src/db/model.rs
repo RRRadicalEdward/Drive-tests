@@ -2,7 +2,7 @@ use serde_derive::Deserialize;
 
 //use diesel::deserialize::{Queryable, QueryableByName};
 
-use crate::db::schema::users;
+use crate::db::schema::{tests, users};
 use std::io::{self, ErrorKind};
 
 #[derive(Deserialize, Insertable)]
@@ -14,15 +14,23 @@ pub struct UserForm<'a> {
 }
 #[derive(Queryable, PartialEq, Debug)]
 pub struct User {
-    id: i32,
-    name: String,
-    second_name: String,
-    password: String,
-    scores: i32,
+    pub id: i32,
+    pub name: String,
+    pub second_name: String,
+    pub password: String,
+    pub scores: i32,
 }
+
+#[derive(Deserialize, Insertable)]
+#[table_name = "tests"]
+pub struct TestFrom {
+    id: i32,
+    level: i32,
+}
+
 #[derive(Queryable, PartialEq, Debug)]
 pub struct Tests {
-    id: u32,
+    id: i32,
     level: TestLevel,
 }
 
