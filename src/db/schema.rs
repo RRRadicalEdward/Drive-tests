@@ -1,5 +1,5 @@
 table! {
-    users{
+    users (id) {
         id -> Integer,
         name -> Varchar,
         second_name -> Varchar,
@@ -8,8 +8,8 @@ table! {
     }
 }
 table! {
-    tests{
+    tests (id) {
         id -> Integer,
-        Level -> Integer,
+        level -> Integer,
     }
 }

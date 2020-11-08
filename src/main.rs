@@ -15,7 +15,7 @@ fn main() -> anyhow::Result<()> {
     info!("Successfully connected to the DB");
 
     rocket::ignite()
-        .mount("/", routes![web::show_users_table, web::registor_new_user, web::validate_user])
+        .mount("/", routes![web::sing_in, web::sing_up])
         .launch();
     Ok(())
 }
