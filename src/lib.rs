@@ -5,9 +5,9 @@ extern crate diesel;
 #[macro_use]
 extern crate anyhow;
 #[macro_use]
-extern crate rocket;
-#[macro_use]
 extern crate lazy_static;
 
 pub mod db;
 pub mod web;
+
+use db::model;

@@ -11,8 +11,8 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.33"
-rocket = "0.4.5"
 diesel = "1.4"
+actix-web = "3.2.0"
 log = "0.4.11"
 simple_logger = "1.11.0"
 serde = "1.0"
@@ -22,6 +22,7 @@ rsa = "0.3.0"
 rand = "0.7.3"
 hex = "0.4.2"
 lazy_static = "1.4.0"
+
 
 [dependencies.rocket_contrib]
 version = "0.4.5"

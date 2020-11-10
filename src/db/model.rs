@@ -7,10 +7,10 @@ use std::io::{self, ErrorKind};
 
 #[derive(Deserialize, Insertable)]
 #[table_name = "users"]
-pub struct UserForm<'a> {
-    name: &'a str,
-    second_name: &'a str,
-    password: &'a str,
+pub struct UserForm {
+    pub name: String,
+    pub second_name: String,
+    pub password: String,
 }
 #[derive(Queryable, PartialEq, Debug)]
 pub struct User {
