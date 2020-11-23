@@ -2,11 +2,10 @@ use rsa::{pem, PaddingScheme, PublicKey, RSAPrivateKey, RSAPublicKey};
 
 use rand::rngs::OsRng;
 
-use crate::diesel::QueryDsl;
+use diesel::QueryDsl;
 use diesel::expression::dsl::exists;
-use diesel::mysql::MysqlConnection;
-use diesel::prelude::Connection;
-use diesel::{insert_into, select};
+use diesel::sqlite::{Sqlite, SqliteConnection};
+use diesel::{insert_into, select, Connection};
 use diesel::{BoolExpressionMethods, ExpressionMethods, RunQueryDsl};
 
 use serde_json::Value;
@@ -25,7 +24,7 @@ pub mod schema;
 use schema::users;
 
 lazy_static! {
-    static ref DB: Arc<Mutex<anyhow::Result<MysqlConnection>>> = {
+    static ref DB: Arc<Mutex<anyhow::Result<SqliteConnection>>> = {
         let db = extablish_connection_impl();
         Arc::new(Mutex::new(db))
     };
@@ -45,22 +44,16 @@ pub fn extablish_connection() -> anyhow::Result<()> {
     }
 }
 
-fn extablish_connection_impl() -> anyhow::Result<MysqlConnection> {
+fn extablish_connection_impl() -> anyhow::Result<SqliteConnection> {
     let config_file = File::open("config.json").unwrap();
 
     let config: Value = serde_json::from_reader(config_file).unwrap();
 
-    let user_name = config["user_name"].as_str().unwrap();
-    let password = config["password"].as_str().unwrap();
-    let localhost = "127.0.0.1:3306";
-    let db_name = config["db_name"].as_str().unwrap();
-
     let database_url = format!(
-        "mysql://{}:{}@{}/{}",
-        user_name, password, localhost, db_name
+        "../../drive_tests_db"
     );
 
-    MysqlConnection::establish(&database_url).map_err(|err| err.into())
+    SqliteConnection::establish(&database_url).map_err(|err| err.into())
 }
 
 pub fn registar_new_user(

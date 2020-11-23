@@ -1,144 +1,111 @@
+use actix_web::{get, post, web, HttpResponse};
+use serde_derive::{Deserialize, Serialize};
 use log::{debug, error, info};
 
-use rocket::http::RawStr;
-use rocket::http::{ContentType, Status};
-use rocket::request::{LenientForm, Request};
-use rocket::response::{self, Responder, Response};
-
-//use diesel::result::{DatabaseErrorKind, Error};
-
+use std::io::{self, ErrorKind};
 use std::convert::TryInto;
 
 use crate::db;
+use crate::model::UserForm;
 
-#[post("/sing_up", data = "<user>")]
-pub fn sing_up(user: LenientForm<UserRequestForm>) -> UserRequestResult {
+#[post("/user")]
+pub async fn sing_up(user: web::Json<UserForm>) -> actix_web::Result<HttpResponse> {
     info!(
         "There is a new user:[name - {}, second name - {}]",
-        user.user_name, user.second_name
+        user.name, user.name
     );
 
-    let response = match db::registar_new_user(&user.user_name, &user.second_name, user.password) {
+    let http_response = match db::registar_new_user(&user.name, &user.name, &user.password) {
         Ok(_) => {
             debug!("Successfully registory a new user");
-            UserRequestResult::Succesfully(UserGoodResponse {
-                user_name: user.user_name.to_string(),
+            let response = UserRequestResult::Succesfully(UserGoodResponse {
+                user_name: user.name.to_string(),
                 second_name: user.second_name.to_string(),
                 scores: 0,
-            })
+            });
+
+            HttpResponse::Ok().json(response)
         }
         Err(err) => {
             error!("Error while registoring a new user - {}", err);
-            UserRequestResult::Failed(UserBadReponse {
-                cause: String::from("error!"),
-            })
+            return Err(actix_web::error::ErrorInternalServerError(io::Error::new(
+                ErrorKind::Other,
+                "An Error occured in the server, try one more time",
+            )));
         }
     };
     info!("Successfully proccess a new user");
 
-    response
+    Ok(http_response)
 }
 
-#[post("/sing_in", data = "<user>")]
-pub fn sing_in(user: LenientForm<UserRequestForm>) -> UserRequestResult {
+#[get("/user")]
+pub async fn sing_in(user: web::Json<UserForm>) -> actix_web::Result<HttpResponse> {
     debug!(
         "Validation of user:[name - {}, second name - {}]",
-        user.user_name, user.second_name
+        user.name, user.second_name
     );
-    match db::check_if_user_exists(&user.user_name, &user.second_name) {
+    match db::check_if_user_exists(&user.name, &user.second_name) {
         Ok(true) => {}
         Ok(false) => {
             debug!("The user doesn't present in the DB");
-            return UserRequestResult::Failed(UserBadReponse {
+            let response = UserRequestResult::Failed(UserBadReponse {
                 cause: String::from("The user doesn't present in the DB"),
             });
+            return Ok(HttpResponse::NotFound().json(response));
         }
         Err(err) => {
-            error!("Error occured while singing in the user - {}", err);
-            return UserRequestResult::Failed(UserBadReponse {
-                cause: String::from("error!"),
-            });
+            error!("An error occured while singing in the user - {}", err);
+            return Err(actix_web::error::ErrorInternalServerError(io::Error::new(
+                ErrorKind::Other,
+                "An Error occured in the server, try one more time",
+            )));
         }
     };
 
     debug!("The user exists in the DB");
 
-    match db::verify_password(
-        &user.user_name,
-        &user.second_name,
-        user.password.to_string(),
-    ) {
-        Ok((true, scores)) => {
-            debug!("The user passed password verifying");
-            UserRequestResult::Succesfully(UserGoodResponse {
-                user_name: user.user_name.to_string(),
-                second_name: user.second_name.to_string(),
-                scores: scores.try_into().unwrap(),
-            })
-        }
-        Ok((false, _)) => {
-            debug!("The user hasn't passed password verify");
-            UserRequestResult::Failed(UserBadReponse {
-                cause: String::from("The user hasn't passed password verify"),
-            })
-        }
-        Err(err) => {
-            error!("Error occured while veriying the user  - {}", err);
-            UserRequestResult::Failed(UserBadReponse {
-                cause: String::from("error!"),
-            })
-        }
-    }
-}
+    let http_response =
+        match db::verify_password(&user.name, &user.second_name, user.password.to_string()) {
+            Ok((true, scores)) => {
+                debug!("The user passed password verifying");
+                let user = UserGoodResponse {
+                    user_name: user.name.clone(),
+                    second_name: user.second_name.to_string(),
+                    scores: scores.try_into().unwrap(),
+                };
+                HttpResponse::Ok().json(user)
+            }
+            Ok((false, _)) => {
+                debug!("The user hasn't passed password verify");
+                let repsonse = UserRequestResult::Failed(UserBadReponse {
+                    cause: String::from("The user hasn't passed password verify"),
+                });
+                HttpResponse::NotFound().json(repsonse)
+            }
+            Err(err) => {
+                error!("An error occured while verifying the user  - {}", err);
 
-#[derive(FromForm)]
-pub struct UserRequestForm<'a> {
-    user_name: &'a RawStr,
-    second_name: &'a RawStr,
-    password: &'a RawStr,
+                return Err(actix_web::error::ErrorInternalServerError(io::Error::new(
+                    ErrorKind::Other,
+                    "An Error occured in the server, try one more time",
+                )));
+            }
+        };
+    Ok(http_response)
 }
+#[derive(Serialize, Deserialize)]
 pub struct UserGoodResponse {
     user_name: String,
     second_name: String,
     scores: u32,
 }
-
+#[derive(Serialize, Deserialize)]
 pub struct UserBadReponse {
     cause: String,
 }
-
+#[derive(Serialize, Deserialize)]
 pub enum UserRequestResult {
     Succesfully(UserGoodResponse),
     Failed(UserBadReponse),
-}
-
-impl<'r> Responder<'r> for UserGoodResponse {
-    fn respond_to(self, _: &Request) -> response::Result<'r> {
-        Response::build()
-            .status(Status::Ok)
-            .header(ContentType::Plain)
-            .raw_header("user_name", format!("{}", self.user_name))
-            .raw_header("second_name", format!("{}", self.second_name))
-            .raw_header("scores", format!("{}", self.scores))
-            .ok()
-    }
-}
-
-impl<'r> Responder<'r> for UserBadReponse {
-    fn respond_to(self, _: &Request) -> response::Result<'r> {
-        Response::build()
-            .status(Status::BadRequest)
-            .header(ContentType::Plain)
-            .raw_header("Failed to procces the request", self.cause)
-            .ok()
-    }
-}
-
-impl<'r> Responder<'r> for UserRequestResult {
-    fn respond_to(self, r: &Request) -> response::Result<'r> {
-        match self {
-            UserRequestResult::Succesfully(user_good_reponse) => user_good_reponse.respond_to(r),
-            UserRequestResult::Failed(user_bad_response) => user_bad_response.respond_to(r),
-        }
-    }
 }

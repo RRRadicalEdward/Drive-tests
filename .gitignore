@@ -1,7 +1,5 @@
 /target
 /.vscode
-.env
+.idea
 Cargo.lock
-config.json
-private-key.pem
-public-key.pem
+
