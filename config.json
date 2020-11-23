@@ -1,5 +1,6 @@
 {
     "user_name": "root",
     "password": "",
+    "localhost": "127.0.0.1:3036",
     "db_name": "drive_tests_db"
 }
