@@ -4,9 +4,7 @@ use log::info;
 
 use simple_logger::SimpleLogger;
 
-
 use std::env;
-
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
@@ -20,7 +18,6 @@ async fn main() -> anyhow::Result<()> {
 
     let tls_builder = web::tls_builder()?;
 
-    
     info!("Successfully connected to the DB");
 
     HttpServer::new(|| {
@@ -33,5 +30,4 @@ async fn main() -> anyhow::Result<()> {
     .run()
     .await
     .map_err(|err| err.into())
-
 }
