@@ -2,15 +2,11 @@ use rsa::{pem, PaddingScheme, PublicKey, RSAPrivateKey, RSAPublicKey};
 
 use rand::rngs::OsRng;
 
-use diesel::QueryDsl;
 use diesel::expression::dsl::exists;
-use diesel::sqlite::{Sqlite, SqliteConnection};
+use diesel::sqlite::SqliteConnection;
+use diesel::QueryDsl;
 use diesel::{insert_into, select, Connection};
 use diesel::{BoolExpressionMethods, ExpressionMethods, RunQueryDsl};
-
-use serde_json::Value;
-
-//use log::{debug, error, info};
 
 use std::convert::TryFrom;
 use std::fs::File;
@@ -45,15 +41,7 @@ pub fn extablish_connection() -> anyhow::Result<()> {
 }
 
 fn extablish_connection_impl() -> anyhow::Result<SqliteConnection> {
-    let config_file = File::open("config.json").unwrap();
-
-    let config: Value = serde_json::from_reader(config_file).unwrap();
-
-    let database_url = format!(
-        "../../drive_tests_db"
-    );
-
-    SqliteConnection::establish(&database_url).map_err(|err| err.into())
+    SqliteConnection::establish("../../drive_tests_db").map_err(|err| err.into())
 }
 
 pub fn registar_new_user(
