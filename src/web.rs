@@ -1,9 +1,10 @@
 use actix_web::{get, post, web, HttpResponse};
-use serde_derive::{Deserialize, Serialize};
 use log::{debug, error, info};
+use openssl::ssl::{SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod};
+use serde_derive::{Deserialize, Serialize};
 
-use std::io::{self, ErrorKind};
 use std::convert::TryInto;
+use std::io::{self, ErrorKind};
 
 use crate::db;
 use crate::model::UserForm;
@@ -94,6 +95,12 @@ pub async fn sing_in(user: web::Json<UserForm>) -> actix_web::Result<HttpRespons
         };
     Ok(http_response)
 }
+
+#[get("/healthy")]
+async fn healthy() -> actix_web::Result<HttpResponse> {
+    let response = "Drive-tests is wroking and healthy".to_string();
+    Ok(HttpResponse::Ok().json(response))
+}
 #[derive(Serialize, Deserialize)]
 pub struct UserGoodResponse {
     user_name: String,
@@ -108,4 +115,11 @@ pub struct UserBadReponse {
 pub enum UserRequestResult {
     Succesfully(UserGoodResponse),
     Failed(UserBadReponse),
+}
+
+pub fn tls_builder() -> anyhow::Result<SslAcceptorBuilder> {
+    let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
+    builder.set_private_key_file("cert/key.pem", SslFiletype::PEM)?;
+    builder.set_certificate_chain_file("cert/cert.pem")?;
+    Ok(builder)
 }

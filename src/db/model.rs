@@ -42,6 +42,7 @@ pub enum TestLevel {
 }
 
 impl TestLevel {
+    #![allow(dead_code)]
     fn new(level_value: u32) -> Result<TestLevel, io::Error> {
         match level_value {
             1 => Ok(TestLevel::Easy),
