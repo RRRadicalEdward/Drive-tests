@@ -11,5 +11,7 @@ table! {
     tests (id) {
         id -> Integer,
         level -> Integer,
+        description -> Text,
+        answers -> Text,
     }
 }

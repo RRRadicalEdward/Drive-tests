@@ -1,111 +1,170 @@
-use actix_web::{get, post, web, HttpResponse};
-use serde_derive::{Deserialize, Serialize};
+use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use log::{debug, error, info};
+use openssl::ssl::{SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod};
+use serde_json::json;
 
-use std::io::{self, ErrorKind};
-use std::convert::TryInto;
-
-use crate::db;
-use crate::model::UserForm;
+use crate::{
+    db::{self, DbPool},
+    model::UserForm,
+};
 
 #[post("/user")]
-pub async fn sing_up(user: web::Json<UserForm>) -> actix_web::Result<HttpResponse> {
+pub async fn sing_up(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse> {
     info!(
         "There is a new user:[name - {}, second name - {}]",
         user.name, user.name
     );
+    let user = user.into_inner();
 
-    let http_response = match db::registar_new_user(&user.name, &user.name, &user.password) {
-        Ok(_) => {
-            debug!("Successfully registory a new user");
-            let response = UserRequestResult::Succesfully(UserGoodResponse {
-                user_name: user.name.to_string(),
-                second_name: user.second_name.to_string(),
-                scores: 0,
-            });
+    let user_clone = user.clone();
+    web::block(move || db::registry_new_user(user_clone, pool))
+        .await
+        .map_err(|err| {
+            error!("Error while registering a new user - {}", err);
+            HttpResponse::InternalServerError().finish()
+        })?;
 
-            HttpResponse::Ok().json(response)
-        }
-        Err(err) => {
-            error!("Error while registoring a new user - {}", err);
-            return Err(actix_web::error::ErrorInternalServerError(io::Error::new(
-                ErrorKind::Other,
-                "An Error occured in the server, try one more time",
-            )));
-        }
-    };
-    info!("Successfully proccess a new user");
+    debug!("Successfully registry {} {} user", user.name, user.second_name);
+
+    let http_response = HttpResponse::Ok().content_type("application/json").json(json!({
+        "user_name"  : user.name,
+        "second_name": user.second_name,
+        "scores"     : "0",
+    }));
 
     Ok(http_response)
 }
 
 #[get("/user")]
-pub async fn sing_in(user: web::Json<UserForm>) -> actix_web::Result<HttpResponse> {
+pub async fn sing_in(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse> {
+    let user = user.into_inner();
     debug!(
         "Validation of user:[name - {}, second name - {}]",
         user.name, user.second_name
     );
-    match db::check_if_user_exists(&user.name, &user.second_name) {
-        Ok(true) => {}
-        Ok(false) => {
-            debug!("The user doesn't present in the DB");
-            let response = UserRequestResult::Failed(UserBadReponse {
-                cause: String::from("The user doesn't present in the DB"),
-            });
-            return Ok(HttpResponse::NotFound().json(response));
+
+    let user_clone = user.clone();
+    let pool_clone = pool.clone();
+    let check_passed = web::block(move || db::check_if_user_exists(user_clone, pool_clone))
+        .await
+        .map_err(|err| {
+            error!("An error occurred while singing in the user - {}", err);
+            HttpResponse::InternalServerError().finish()
+        })?;
+
+    if !check_passed {
+        debug!("The user doesn't present in the DB");
+        return Ok(HttpResponse::NotFound().finish());
+    }
+
+    debug!("The {} {} user exists in the DB", user.name, user.second_name);
+    let user_clone = user.clone();
+    let pool_clone = pool.clone();
+    let (verify_passed, scores) = web::block(move || db::verify_password(user_clone, pool_clone))
+        .await
+        .map_err(|err| {
+            error!("An error occurred while verifying the user  - {}", err);
+            HttpResponse::InternalServerError().finish()
+        })?;
+
+    let http_response = match verify_passed {
+        true => {
+            debug!("The user passed password verifying");
+            HttpResponse::Ok().content_type("application/json").json(json!({
+                "user_name"  : user.name.clone(),
+                "second_name": user.second_name.to_string(),
+                "scores"     : scores.to_string(),
+            }))
         }
-        Err(err) => {
-            error!("An error occured while singing in the user - {}", err);
-            return Err(actix_web::error::ErrorInternalServerError(io::Error::new(
-                ErrorKind::Other,
-                "An Error occured in the server, try one more time",
-            )));
+        false => {
+            debug!("The user hasn't passed password verify");
+            HttpResponse::NotFound().finish()
         }
     };
-
-    debug!("The user exists in the DB");
-
-    let http_response =
-        match db::verify_password(&user.name, &user.second_name, user.password.to_string()) {
-            Ok((true, scores)) => {
-                debug!("The user passed password verifying");
-                let user = UserGoodResponse {
-                    user_name: user.name.clone(),
-                    second_name: user.second_name.to_string(),
-                    scores: scores.try_into().unwrap(),
-                };
-                HttpResponse::Ok().json(user)
-            }
-            Ok((false, _)) => {
-                debug!("The user hasn't passed password verify");
-                let repsonse = UserRequestResult::Failed(UserBadReponse {
-                    cause: String::from("The user hasn't passed password verify"),
-                });
-                HttpResponse::NotFound().json(repsonse)
-            }
-            Err(err) => {
-                error!("An error occured while verifying the user  - {}", err);
-
-                return Err(actix_web::error::ErrorInternalServerError(io::Error::new(
-                    ErrorKind::Other,
-                    "An Error occured in the server, try one more time",
-                )));
-            }
-        };
     Ok(http_response)
 }
-#[derive(Serialize, Deserialize)]
-pub struct UserGoodResponse {
-    user_name: String,
-    second_name: String,
-    scores: u32,
+
+#[get("/test")]
+pub async fn get_test(pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse> {
+    let test = web::block(move || db::get_test(pool)).await.map_err(|err| {
+        error!("get test error - {}", err);
+        HttpResponse::InternalServerError().finish()
+    })?;
+
+    let answers_json = serde_json::to_value(test.answers.clone()).map_err(|err| {
+        error!("failed to parse {} test answers to json - {}", test.id, err);
+        HttpResponse::InternalServerError().finish()
+    })?;
+
+    let response = HttpResponse::Ok().content_type("application/json").json(json!({
+        "description": test.description,
+        "answers"    : answers_json,
+    }));
+    Ok(response)
 }
-#[derive(Serialize, Deserialize)]
-pub struct UserBadReponse {
-    cause: String,
+
+#[get("/test/{test_id}&answer")]
+pub async fn get_result(request: HttpRequest) -> actix_web::Result<HttpResponse> {
+    let _test_id: u32 = request.match_info().get("test_id").unwrap().parse().unwrap();
+    let _answer: u32 = request.match_info().get("answer").unwrap().parse().unwrap();
+
+    Ok(HttpResponse::BadRequest().finish())
 }
-#[derive(Serialize, Deserialize)]
-pub enum UserRequestResult {
-    Succesfully(UserGoodResponse),
-    Failed(UserBadReponse),
+
+#[post("/test/{test_id}&user&answer")]
+pub async fn get_result_with_user(
+    path: web::Path<(u32, u32)>,
+    user: web::Json<UserForm>,
+    pool: web::Data<DbPool>,
+) -> actix_web::Result<HttpResponse> {
+    let (_test_id, _answer) = path.0;
+
+    let user_clone = user.clone();
+    let pool_clone = pool.clone();
+    let check_passed = web::block(move || db::check_if_user_exists(user_clone, pool_clone))
+        .await
+        .map_err(|err| {
+            error!("check_if_user_exists error - {}", err);
+            HttpResponse::InternalServerError().finish();
+        })?;
+
+    if !check_passed {
+        return Ok(HttpResponse::NotFound().finish());
+    }
+
+    let user_clone = user.clone();
+    let pool_clone = pool.clone();
+    let (verify_passed, _scores) = web::block(move || db::verify_password(user_clone, pool_clone))
+        .await
+        .map_err(|err| {
+            error!("check_if_user_exists error - {}", err);
+            HttpResponse::InternalServerError().finish();
+        })?;
+
+    if !verify_passed {
+        return Ok(HttpResponse::NotFound().finish());
+    }
+
+    Ok(HttpResponse::BadRequest().finish())
+}
+
+/*
+#[get("/test?user")]
+pub async fn (user: web::Json<UserForm>)  -> actix_web::Result<HttpResponse> {
+
+}
+/
+ */
+
+#[get("/healthy")]
+pub async fn healthy() -> actix_web::Result<HttpResponse> {
+    let response = "Drive-tests is working and healthy".to_string();
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub fn tls_builder() -> anyhow::Result<SslAcceptorBuilder> {
+    let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
+    builder.set_private_key_file("cert/key.pem", SslFiletype::PEM)?;
+    builder.set_certificate_chain_file("cert/cert.pem")?;
+    Ok(builder)
 }
