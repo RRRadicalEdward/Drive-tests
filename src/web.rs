@@ -121,7 +121,6 @@ pub async fn check_answer(path: web::Path<(u32, u32)>, pool: web::Data<DbPool>) 
             error!("check_if_user_exists error - {}", err);
             HttpResponse::InternalServerError().finish();
         })?;
-
     match check_result {
         true => {
             let scores = test_level.to_scores();

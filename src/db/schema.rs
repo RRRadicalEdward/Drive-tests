@@ -1,9 +1,9 @@
 table! {
     users (id) {
         id -> Integer,
-        name -> Varchar,
-        second_name -> Varchar,
-        password -> Longtext,
+        name -> Text,
+        second_name -> Text,
+        password -> Text,
         scores -> Integer,
     }
 }

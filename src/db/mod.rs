@@ -25,13 +25,13 @@ use std::convert::TryInto;
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 
 pub fn establish_connection() -> DbPool {
-    let database_url = "../../drive_tests_db";
-    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
+    let database_path = "../../drive_tests_db.db";
+    let manager = ConnectionManager::<SqliteConnection>::new(database_path);
     r2d2::Pool::builder().build(manager).expect("Failed to crate DB pool")
 }
 
 pub fn registry_new_user(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Result<()> {
-    use self::users::dsl::*;
+    use schema::users::dsl::*;
 
     if check_if_user_exists(user.clone(), pool.clone())? {
         return Err(anyhow!(format!(
@@ -44,7 +44,7 @@ pub fn registry_new_user(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Res
 
     let db = pool.get().unwrap();
     let insert_result = insert_into(users)
-        .values((
+        .values(&(
             name.eq(user.name),
             second_name.eq(user.second_name),
             password.eq(encrypted_password),
@@ -59,7 +59,7 @@ pub fn registry_new_user(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Res
 }
 
 pub fn check_if_user_exists(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Result<bool> {
-    use self::users::dsl::*;
+    use schema::users::dsl::*;
 
     let db = pool.get().unwrap();
 
@@ -90,7 +90,7 @@ fn encrypt_password(password: String) -> anyhow::Result<String> {
 }
 
 fn decrypt_password(encrypted_password_hex: String) -> anyhow::Result<String> {
-    let mut encrypted_password: Vec<u8> = Vec::with_capacity(encrypted_password_hex.len() / 2);
+    let mut encrypted_password: Vec<u8> = vec![0; encrypted_password_hex.len() / 2];
 
     hex::decode_to_slice(encrypted_password_hex, &mut encrypted_password)?;
 
@@ -188,4 +188,117 @@ pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &web::Data<DbPool>)
         .map_err(|err| anyhow!("failed to select test with {} id: {}", test_id, err))?;
     let test_level = TestLevel::new(selected_test.level.try_into()?)?;
     Ok((selected_test.right_answer_id == answer_id, test_level))
+}
+
+#[cfg(test)]
+mod _tests {
+    use super::*;
+    use uuid::Uuid;
+
+    const PASSWORD: &str = "password";
+
+    lazy_static! {
+        static ref DB: DbPool = establish_connection();
+        static ref USER: UserForm = {
+            let name = Uuid::new_v4().to_string();
+            let second_name = Uuid::new_v4().to_string();
+            let password = PASSWORD.to_string();
+            UserForm {
+                name,
+                second_name,
+                password,
+            }
+        };
+    }
+
+    fn remove_user_from_db(user: UserForm) {
+        use self::users::dsl::*;
+
+        let db = DB.get().unwrap();
+        diesel::delete(users.filter((name.eq(user.name.clone())).and(second_name.eq(user.second_name.clone()))))
+            .execute(db.deref())
+            .unwrap();
+    }
+
+    #[test]
+    fn encrypted_decrypt_password() {
+        let password = "password".to_string();
+        let encrypted_password = encrypt_password(password.clone()).unwrap();
+        let decrypted_password = decrypt_password(encrypted_password).unwrap();
+        assert_eq!(password, decrypted_password);
+    }
+
+    #[test]
+    fn registry_new_user_test() {
+        let db = web::Data::new(DB.clone());
+
+        let registry_result = registry_new_user(USER.clone(), db.clone());
+        remove_user_from_db(USER.clone());
+        let registry_result = registry_result.unwrap();
+
+        assert_eq!(registry_result, ());
+    }
+
+    #[test]
+    fn check_if_user_exist_for_existing_user() {
+        let db = web::Data::new(DB.clone());
+
+        registry_new_user(USER.clone(), db.clone()).unwrap();
+        let check_result = check_if_user_exists(USER.clone(), db.clone()).unwrap();
+        remove_user_from_db(USER.clone());
+        assert!(check_result);
+    }
+
+    #[test]
+    fn check_if_user_exist_for_not_existing_user() {
+        let db = web::Data::new(DB.clone());
+        let check_result = check_if_user_exists(USER.clone(), db).unwrap();
+
+        assert!(!check_result);
+    }
+
+    #[test]
+    fn verify_password_for_correct_password() {
+        let db = web::Data::new(DB.clone());
+
+        registry_new_user(USER.clone(), db.clone()).unwrap();
+        let verify_password_result = verify_password(USER.clone(), db).unwrap();
+        remove_user_from_db(USER.clone());
+        assert!(verify_password_result);
+    }
+
+    #[test]
+    fn verify_password_for_incorrect_password() {
+        let db = web::Data::new(DB.clone());
+        registry_new_user(USER.clone(), db.clone()).unwrap();
+
+        let mut user = USER.clone();
+        user.password = "Some incorrect password".to_string();
+        let verify_password_result = verify_password(user.clone(), db).unwrap();
+        remove_user_from_db(USER.clone());
+        assert!(!verify_password_result);
+    }
+
+    #[test]
+    fn get_scores_for_just_registered_user() {
+        let db = web::Data::new(DB.clone());
+        registry_new_user(USER.clone(), db.clone()).unwrap();
+
+        let scores = get_scores(&USER, &db).unwrap();
+        remove_user_from_db(USER.clone());
+        assert_eq!(scores, 0);
+    }
+
+    #[test]
+    fn get_scores_for_after_add_scores_returns_right_scores_value() {
+        let db = web::Data::new(DB.clone());
+        registry_new_user(USER.clone(), db.clone()).unwrap();
+        let rand_scores = rand::random::<u32>() % 1000;
+
+        add_scores(&USER, rand_scores, &db).unwrap();
+        let scores = get_scores(&USER, &db.clone()).unwrap();
+
+        remove_user_from_db(USER.clone());
+        assert_eq!(scores, rand_scores);
+    }
 }
