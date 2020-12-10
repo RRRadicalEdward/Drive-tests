@@ -1,4 +1,4 @@
-use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use actix_web::{get, post, web, HttpResponse};
 use log::{debug, error, info};
 use openssl::ssl::{SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod};
 use serde_json::json;
@@ -60,10 +60,19 @@ pub async fn sing_in(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> acti
     debug!("The {} {} user exists in the DB", user.name, user.second_name);
     let user_clone = user.clone();
     let pool_clone = pool.clone();
-    let (verify_passed, scores) = web::block(move || db::verify_password(user_clone, pool_clone))
+    let verify_passed = web::block(move || db::verify_password(user_clone, pool_clone))
         .await
         .map_err(|err| {
-            error!("An error occurred while verifying the user  - {}", err);
+            error!("An error occurred while verifying the user - {}", err);
+            HttpResponse::InternalServerError().finish()
+        })?;
+
+    let user_clone = user.clone();
+    let pool_clone = pool.clone();
+    let scores = web::block(move || db::get_scores(&user_clone, &pool_clone))
+        .await
+        .map_err(|err| {
+            error!("An error occurred while getting scores - {}", err);
             HttpResponse::InternalServerError().finish()
         })?;
 
@@ -103,21 +112,34 @@ pub async fn get_test(pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse
     Ok(response)
 }
 
-#[get("/test/{test_id}&answer")]
-pub async fn get_result(request: HttpRequest) -> actix_web::Result<HttpResponse> {
-    let _test_id: u32 = request.match_info().get("test_id").unwrap().parse().unwrap();
-    let _answer: u32 = request.match_info().get("answer").unwrap().parse().unwrap();
+#[get("/test?test_id&answer_id")]
+pub async fn check_answer(path: web::Path<(u32, u32)>, pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse> {
+    let (test_id, answer_id) = path.0;
+    let (check_result, test_level) = web::block(move || db::check_test_answer(test_id, answer_id, &pool))
+        .await
+        .map_err(|err| {
+            error!("check_if_user_exists error - {}", err);
+            HttpResponse::InternalServerError().finish();
+        })?;
 
-    Ok(HttpResponse::BadRequest().finish())
+    match check_result {
+        true => {
+            let scores = test_level.to_scores();
+            Ok(HttpResponse::Ok()
+                .header("scores", scores.to_string())
+                .body("The answer is correct"))
+        }
+        false => Ok(HttpResponse::Ok().header("scores", "0").body("The answer is correct")),
+    }
 }
 
-#[post("/test/{test_id}&user&answer")]
-pub async fn get_result_with_user(
-    path: web::Path<(u32, u32)>,
+#[post("/test/{user}?test_id&answer_id")]
+pub async fn check_answer_with_user(
     user: web::Json<UserForm>,
+    path: web::Path<(u32, u32)>,
     pool: web::Data<DbPool>,
 ) -> actix_web::Result<HttpResponse> {
-    let (_test_id, _answer) = path.0;
+    let (test_id, answer_id) = path.0;
 
     let user_clone = user.clone();
     let pool_clone = pool.clone();
@@ -134,7 +156,7 @@ pub async fn get_result_with_user(
 
     let user_clone = user.clone();
     let pool_clone = pool.clone();
-    let (verify_passed, _scores) = web::block(move || db::verify_password(user_clone, pool_clone))
+    let verify_passed = web::block(move || db::verify_password(user_clone, pool_clone))
         .await
         .map_err(|err| {
             error!("check_if_user_exists error - {}", err);
@@ -145,16 +167,32 @@ pub async fn get_result_with_user(
         return Ok(HttpResponse::NotFound().finish());
     }
 
-    Ok(HttpResponse::BadRequest().finish())
-}
+    let pool_clone = pool.clone();
+    let (check_result, test_level) = web::block(move || db::check_test_answer(test_id, answer_id, &pool_clone))
+        .await
+        .map_err(|err| {
+            error!("check_if_user_exists error - {}", err);
+            HttpResponse::InternalServerError().finish();
+        })?;
 
-/*
-#[get("/test?user")]
-pub async fn (user: web::Json<UserForm>)  -> actix_web::Result<HttpResponse> {
-
+    let user_clone = user.clone();
+    let pool_clone = pool.clone();
+    match check_result {
+        true => {
+            let scores = test_level.to_scores();
+            web::block(move || db::add_scores(&user_clone, scores, &pool_clone))
+                .await
+                .map_err(|err| {
+                    error!("failed to add new scores after passing a test successfully - {}", err);
+                    HttpResponse::InternalServerError().finish();
+                })?;
+            Ok(HttpResponse::Ok()
+                .header("scores", scores.to_string())
+                .body("The answer is correct"))
+        }
+        false => Ok(HttpResponse::Ok().header("scores", "0").body("The answer is correct")),
+    }
 }
-/
- */
 
 #[get("/healthy")]
 pub async fn healthy() -> actix_web::Result<HttpResponse> {

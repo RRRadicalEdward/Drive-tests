@@ -13,5 +13,6 @@ table! {
         level -> Integer,
         description -> Text,
         answers -> Text,
+        right_answer_id -> Integer,
     }
 }

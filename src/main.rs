@@ -29,9 +29,9 @@ async fn main() -> anyhow::Result<()> {
             .data(connection_pool.clone())
             .service(web::sing_in)
             .service(web::sing_up)
-            .service(web::get_result_with_user)
+            .service(web::check_answer_with_user)
             .service(web::get_test)
-            .service(web::get_result)
+            .service(web::check_answer)
             .service(web::healthy)
     })
     .bind_openssl(server_addr, tls_builder)?

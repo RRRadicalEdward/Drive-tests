@@ -18,7 +18,9 @@ pub mod schema;
 
 use schema::{tests, users};
 
+use crate::db::model::TestLevel;
 use model::UserForm;
+use std::convert::TryInto;
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 
@@ -38,7 +40,7 @@ pub fn registry_new_user(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Res
         )));
     }
 
-    let encrypted_password = encrypted_password(user.password.clone())?;
+    let encrypted_password = encrypt_password(user.password.clone())?;
 
     let db = pool.get().unwrap();
     let insert_result = insert_into(users)
@@ -68,7 +70,7 @@ pub fn check_if_user_exists(user: UserForm, pool: web::Data<DbPool>) -> anyhow::
     .map_err(|err| err.into())
 }
 
-fn encrypted_password(password: String) -> anyhow::Result<String> {
+fn encrypt_password(password: String) -> anyhow::Result<String> {
     let mut rng = OsRng;
 
     let mut public_key_file = File::open("public-key.pem")?;
@@ -82,7 +84,7 @@ fn encrypted_password(password: String) -> anyhow::Result<String> {
     let encrypted_password = public_key.encrypt(&mut rng, padding, &password.into_bytes())?;
     let mut encrypted_password_hex: String = String::with_capacity(encrypted_password.len() * 2);
     encrypted_password.iter().for_each(|&num| {
-        encrypted_password_hex.push_str(&format!("{:x}", num));
+        encrypted_password_hex.push_str(&format!("{:02x}", num));
     });
     Ok(encrypted_password_hex)
 }
@@ -107,7 +109,7 @@ fn decrypt_password(encrypted_password_hex: String) -> anyhow::Result<String> {
     Ok(decrypted_password)
 }
 
-pub fn verify_password(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Result<(bool, i32)> {
+pub fn verify_password(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Result<bool> {
     use self::users::dsl::*;
 
     let db = pool.get().unwrap();
@@ -119,12 +121,7 @@ pub fn verify_password(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Resul
         .map_err(|err| anyhow!("failed to find in the DB User - {}", err))?;
 
     let decrypted_password = decrypt_password(selected_user.password)?;
-
-    if decrypted_password == user.password {
-        Ok((true, selected_user.scores))
-    } else {
-        Ok((false, 0))
-    }
+    Ok(decrypted_password == user.password)
 }
 pub fn get_test(pool: web::Data<DbPool>) -> anyhow::Result<model::Test> {
     use self::tests::dsl::*;
@@ -145,7 +142,7 @@ pub fn get_test(pool: web::Data<DbPool>) -> anyhow::Result<model::Test> {
     Ok(test)
 }
 
-pub fn update_scores(user: &UserForm, new_scores: u32, pool: &web::Data<DbPool>) -> anyhow::Result<()> {
+pub fn add_scores(user: &UserForm, add_scores: u32, pool: &web::Data<DbPool>) -> anyhow::Result<()> {
     use self::users::dsl::*;
     let db = pool.get().unwrap();
 
@@ -155,7 +152,7 @@ pub fn update_scores(user: &UserForm, new_scores: u32, pool: &web::Data<DbPool>)
         .first::<model::User>(db.deref())
         .map_err(|err| anyhow!("failed to find in the DB User - {}", err))?;
 
-    selected_user.scores += new_scores as i32;
+    selected_user.scores += add_scores as i32;
 
     diesel::update(users.filter(id.eq(selected_user.id)))
         .set(scores.eq(selected_user.scores))
@@ -163,4 +160,32 @@ pub fn update_scores(user: &UserForm, new_scores: u32, pool: &web::Data<DbPool>)
         .map_err(|err| anyhow!("failed to update user scores - {}", err))?;
 
     Ok(())
+}
+
+pub fn get_scores(user: &UserForm, pool: &web::Data<DbPool>) -> anyhow::Result<u32> {
+    use self::users::dsl::*;
+    let db = pool.get().unwrap();
+
+    let selected_user: model::User = users
+        .order(id)
+        .filter((name.eq(user.name.clone())).and(second_name.eq(user.second_name.clone())))
+        .first::<model::User>(db.deref())
+        .map_err(|err| anyhow!("failed to find in the DB User - {}", err))?;
+    Ok(selected_user.scores.try_into()?)
+}
+
+pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &web::Data<DbPool>) -> anyhow::Result<(bool, TestLevel)> {
+    use self::tests::dsl::*;
+    let db = pool.get().unwrap();
+
+    let test_id: i32 = test_id.try_into()?;
+    let answer_id: i32 = answer_id.try_into()?;
+
+    let selected_test: model::Test = tests
+        .order(id)
+        .filter(id.eq(test_id))
+        .first::<model::Test>(db.deref())
+        .map_err(|err| anyhow!("failed to select test with {} id: {}", test_id, err))?;
+    let test_level = TestLevel::new(selected_test.level.try_into()?)?;
+    Ok((selected_test.right_answer_id == answer_id, test_level))
 }

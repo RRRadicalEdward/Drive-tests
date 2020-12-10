@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-//use diesel::deserialize::{Queryable, QueryableByName};
-
 use crate::db::schema::{tests, users};
 use std::io::{self, ErrorKind};
 
@@ -27,15 +25,8 @@ pub struct Test {
     pub id: i32,
     pub level: i32,
     pub description: String,
-    pub answers: String,
-}
-
-#[derive(Queryable, PartialEq, Debug)]
-pub struct Tests {
-    id: i32,
-    level: TestLevel,
-    description: String,
-    answers: String,
+    pub answers: String, // TODO: replace with real JSON value
+    pub right_answer_id: i32,
 }
 
 #[derive(PartialEq, Debug)]
@@ -46,13 +37,19 @@ pub enum TestLevel {
 }
 
 impl TestLevel {
-    #![allow(dead_code)]
-    fn new(level_value: u32) -> Result<TestLevel, io::Error> {
+    pub fn new(level_value: u32) -> Result<TestLevel, io::Error> {
         match level_value {
             1 => Ok(TestLevel::Easy),
             3 => Ok(TestLevel::Medium),
             5 => Ok(TestLevel::High),
             _ => Err(io::Error::new(ErrorKind::InvalidData, "Got incorrect test level value")),
+        }
+    }
+    pub fn to_scores(&self) -> u32 {
+        match self {
+            TestLevel::Easy => 1,
+            TestLevel::Medium => 3,
+            TestLevel::High => 5,
         }
     }
 }
