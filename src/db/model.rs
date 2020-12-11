@@ -3,14 +3,15 @@ use serde::{Deserialize, Serialize};
 use crate::db::schema::{tests, users};
 use std::io::{self, ErrorKind};
 
-#[derive(Serialize, Deserialize, Insertable, Clone)]
-#[table_name = "users"]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct UserForm {
     pub name: String,
     pub second_name: String,
     pub password: String,
 }
-#[derive(Queryable, PartialEq, Debug)]
+
+#[derive(Queryable, PartialEq, Debug, Deserialize, Insertable)]
+#[table_name = "users"]
 pub struct User {
     pub id: i32,
     pub name: String,

@@ -1,33 +1,74 @@
 use diesel::{
+    connection::SimpleConnection,
     expression::dsl::{count, exists},
-    insert_into, select,
+    insert_into,
+    r2d2::{ConnectionManager, CustomizeConnection},
+    select,
     sqlite::SqliteConnection,
     BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl,
 };
 use r2d2::Pool;
-use r2d2_diesel::ConnectionManager;
 use rand::rngs::OsRng;
 use rsa::{pem, PaddingScheme, PublicKey, RSAPrivateKey, RSAPublicKey};
 
 use actix_web::web;
 
-use std::{convert::TryFrom, fs::File, io::Read, ops::Deref};
+use std::{
+    convert::{TryFrom, TryInto},
+    fs::File,
+    io::Read,
+    ops::Deref,
+    time::Duration,
+};
 
 pub mod model;
 pub mod schema;
 
-use schema::{tests, users};
-
 use crate::db::model::TestLevel;
 use model::UserForm;
-use std::convert::TryInto;
+use schema::{tests, users};
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 
+#[derive(Debug)]
+struct ConnectionCustomizer {
+    pub enable_wal: bool,
+    pub enable_foreign_keys: bool,
+    pub busy_timeout: Option<Duration>,
+}
+
+impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCustomizer {
+    fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
+        let mut command = String::new();
+        if self.enable_wal {
+            command.push_str(
+                "PRAGMA journal_mode = WAL;
+                          PRAGMA synchronous = NORMAL;",
+            );
+        }
+        if self.enable_foreign_keys {
+            command.push_str("PRAGMA foreign_keys = ON;")
+        }
+        if let Some(d) = self.busy_timeout {
+            command.push_str(&format!("PRAGMA busy_timeout = {};", d.as_millis()))
+        }
+        conn.batch_execute(&command).map_err(diesel::r2d2::Error::QueryError)?;
+        Ok(())
+    }
+}
+
 pub fn establish_connection() -> DbPool {
-    let database_path = "../../drive_tests_db.db";
+    let database_path = "drive_tests_db.db";
     let manager = ConnectionManager::<SqliteConnection>::new(database_path);
-    r2d2::Pool::builder().build(manager).expect("Failed to crate DB pool")
+    r2d2::Pool::builder()
+        .max_size(16)
+        .connection_customizer(Box::new(ConnectionCustomizer {
+            enable_wal: true,
+            enable_foreign_keys: true,
+            busy_timeout: Some(Duration::from_secs(5)),
+        }))
+        .build(manager)
+        .expect("Failed to crate DB pool")
 }
 
 pub fn registry_new_user(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Result<()> {
@@ -48,6 +89,7 @@ pub fn registry_new_user(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Res
             name.eq(user.name),
             second_name.eq(user.second_name),
             password.eq(encrypted_password),
+            scores.eq(0),
         ))
         .execute(db.deref());
 
@@ -118,7 +160,14 @@ pub fn verify_password(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Resul
         .order(id)
         .filter((name.eq(user.name.clone())).and(second_name.eq(user.second_name.clone())))
         .first::<model::User>(db.deref())
-        .map_err(|err| anyhow!("failed to find in the DB User - {}", err))?;
+        .map_err(|err| {
+            anyhow!(
+                "failed to find in {} {} user in the DB - {}",
+                user.name,
+                user.second_name,
+                err
+            )
+        })?;
 
     let decrypted_password = decrypt_password(selected_user.password)?;
     Ok(decrypted_password == user.password)
@@ -150,14 +199,28 @@ pub fn add_scores(user: &UserForm, add_scores: u32, pool: &web::Data<DbPool>) ->
         .order(id)
         .filter((name.eq(user.name.clone())).and(second_name.eq(user.second_name.clone())))
         .first::<model::User>(db.deref())
-        .map_err(|err| anyhow!("failed to find in the DB User - {}", err))?;
+        .map_err(|err| {
+            anyhow!(
+                "failed to find in {} {} user in the DB - {}",
+                user.name,
+                user.second_name,
+                err
+            )
+        })?;
 
     selected_user.scores += add_scores as i32;
 
     diesel::update(users.filter(id.eq(selected_user.id)))
         .set(scores.eq(selected_user.scores))
         .execute(db.deref())
-        .map_err(|err| anyhow!("failed to update user scores - {}", err))?;
+        .map_err(|err| {
+            anyhow!(
+                "failed to find in {} {} user in the DB - {}",
+                user.name,
+                user.second_name,
+                err
+            )
+        })?;
 
     Ok(())
 }
@@ -170,7 +233,14 @@ pub fn get_scores(user: &UserForm, pool: &web::Data<DbPool>) -> anyhow::Result<u
         .order(id)
         .filter((name.eq(user.name.clone())).and(second_name.eq(user.second_name.clone())))
         .first::<model::User>(db.deref())
-        .map_err(|err| anyhow!("failed to find in the DB User - {}", err))?;
+        .map_err(|err| {
+            anyhow!(
+                "failed to find in {} {} user in the DB - {}",
+                user.name,
+                user.second_name,
+                err
+            )
+        })?;
     Ok(selected_user.scores.try_into()?)
 }
 
@@ -199,60 +269,73 @@ mod _tests {
 
     lazy_static! {
         static ref DB: DbPool = establish_connection();
-        static ref USER: UserForm = {
-            let name = Uuid::new_v4().to_string();
-            let second_name = Uuid::new_v4().to_string();
-            let password = PASSWORD.to_string();
-            UserForm {
-                name,
-                second_name,
-                password,
-            }
-        };
+    }
+
+    fn generate_rand_user() -> UserForm {
+        let name = Uuid::new_v4().to_string();
+        let second_name = Uuid::new_v4().to_string();
+        let password = PASSWORD.to_string();
+        UserForm {
+            name,
+            second_name,
+            password,
+        }
     }
 
     fn remove_user_from_db(user: UserForm) {
         use self::users::dsl::*;
 
         let db = DB.get().unwrap();
-        diesel::delete(users.filter((name.eq(user.name.clone())).and(second_name.eq(user.second_name.clone()))))
+        diesel::delete(users.filter((name.eq(user.name.clone())).and(second_name.eq(user.second_name))))
             .execute(db.deref())
             .unwrap();
     }
 
     #[test]
+    fn connection_to_db() {
+        assert!(DB.get().is_ok());
+    }
+
+    #[test]
     fn encrypted_decrypt_password() {
         let password = "password".to_string();
+
         let encrypted_password = encrypt_password(password.clone()).unwrap();
         let decrypted_password = decrypt_password(encrypted_password).unwrap();
+
         assert_eq!(password, decrypted_password);
     }
 
     #[test]
     fn registry_new_user_test() {
         let db = web::Data::new(DB.clone());
+        let user = generate_rand_user();
 
-        let registry_result = registry_new_user(USER.clone(), db.clone());
-        remove_user_from_db(USER.clone());
-        let registry_result = registry_result.unwrap();
+        let registry_result = registry_new_user(user.clone(), db);
 
-        assert_eq!(registry_result, ());
+        remove_user_from_db(user);
+        assert!(registry_result.is_ok());
     }
 
     #[test]
     fn check_if_user_exist_for_existing_user() {
         let db = web::Data::new(DB.clone());
+        let user = generate_rand_user();
 
-        registry_new_user(USER.clone(), db.clone()).unwrap();
-        let check_result = check_if_user_exists(USER.clone(), db.clone()).unwrap();
-        remove_user_from_db(USER.clone());
+        registry_new_user(user.clone(), db.clone()).unwrap();
+
+        let check_result = check_if_user_exists(user.clone(), db).unwrap();
+
+        remove_user_from_db(user);
         assert!(check_result);
     }
 
     #[test]
     fn check_if_user_exist_for_not_existing_user() {
         let db = web::Data::new(DB.clone());
-        let check_result = check_if_user_exists(USER.clone(), db).unwrap();
+        let user = generate_rand_user();
+
+        let check_result = check_if_user_exists(user, db).unwrap();
 
         assert!(!check_result);
     }
@@ -260,45 +343,56 @@ mod _tests {
     #[test]
     fn verify_password_for_correct_password() {
         let db = web::Data::new(DB.clone());
+        let user = generate_rand_user();
 
-        registry_new_user(USER.clone(), db.clone()).unwrap();
-        let verify_password_result = verify_password(USER.clone(), db).unwrap();
-        remove_user_from_db(USER.clone());
+        registry_new_user(user.clone(), db.clone()).unwrap();
+
+        let verify_password_result = verify_password(user.clone(), db).unwrap();
+
+        remove_user_from_db(user);
         assert!(verify_password_result);
     }
 
     #[test]
     fn verify_password_for_incorrect_password() {
         let db = web::Data::new(DB.clone());
-        registry_new_user(USER.clone(), db.clone()).unwrap();
+        let mut user = generate_rand_user();
 
-        let mut user = USER.clone();
+        registry_new_user(user.clone(), db.clone()).unwrap();
+
         user.password = "Some incorrect password".to_string();
         let verify_password_result = verify_password(user.clone(), db).unwrap();
-        remove_user_from_db(USER.clone());
+
+        remove_user_from_db(user);
         assert!(!verify_password_result);
     }
 
     #[test]
     fn get_scores_for_just_registered_user() {
         let db = web::Data::new(DB.clone());
-        registry_new_user(USER.clone(), db.clone()).unwrap();
+        let user = generate_rand_user();
 
-        let scores = get_scores(&USER, &db).unwrap();
-        remove_user_from_db(USER.clone());
+        registry_new_user(user.clone(), db.clone()).unwrap();
+
+        let scores = get_scores(&user, &db).unwrap();
+
+        remove_user_from_db(user);
         assert_eq!(scores, 0);
     }
 
     #[test]
     fn get_scores_for_after_add_scores_returns_right_scores_value() {
         let db = web::Data::new(DB.clone());
-        registry_new_user(USER.clone(), db.clone()).unwrap();
+        let user = generate_rand_user();
+
+        registry_new_user(user.clone(), db.clone()).unwrap();
+
         let rand_scores = rand::random::<u32>() % 1000;
+        add_scores(&user, rand_scores, &db).unwrap();
 
-        add_scores(&USER, rand_scores, &db).unwrap();
-        let scores = get_scores(&USER, &db.clone()).unwrap();
+        let scores = get_scores(&user, &db).unwrap();
 
-        remove_user_from_db(USER.clone());
+        remove_user_from_db(user);
         assert_eq!(scores, rand_scores);
     }
 }
