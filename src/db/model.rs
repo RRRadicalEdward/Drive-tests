@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 use crate::db::schema::{tests, users};
 use std::io::{self, ErrorKind};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct UserForm {
     pub name: String,
+    #[serde(rename = "second_name")]
     pub second_name: String,
     pub password: String,
 }

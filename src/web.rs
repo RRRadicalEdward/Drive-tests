@@ -8,13 +8,13 @@ use crate::{
     model::UserForm,
 };
 
-#[post("/user")]
-pub async fn sing_up(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse> {
+//#[post("/user")]
+pub async fn sing_up(pool: web::Data<DbPool>, user: web::Json<UserForm>) -> actix_web::Result<HttpResponse> {
+    let user = user.into_inner();
     info!(
         "There is a new user:[name - {}, second name - {}]",
         user.name, user.name
     );
-    let user = user.into_inner();
 
     let user_clone = user.clone();
     web::block(move || db::registry_new_user(user_clone, pool))
@@ -27,9 +27,9 @@ pub async fn sing_up(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> acti
     debug!("Successfully registry {} {} user", user.name, user.second_name);
 
     let http_response = HttpResponse::Ok().content_type("application/json").json(json!({
-        "user_name"  : user.name,
-        "second_name": user.second_name,
-        "scores"     : "0",
+        "name" : user.name,
+        "second_name" : user.second_name,
+        "scores" : "0"
     }));
 
     Ok(http_response)
@@ -80,7 +80,7 @@ pub async fn sing_in(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> acti
         true => {
             debug!("The user passed password verifying");
             HttpResponse::Ok().content_type("application/json").json(json!({
-                "user_name"  : user.name.clone(),
+                "name"  : user.name.clone(),
                 "second_name": user.second_name.to_string(),
                 "scores"     : scores.to_string(),
             }))

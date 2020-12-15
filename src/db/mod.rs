@@ -243,7 +243,14 @@ pub fn get_scores(user: &UserForm, pool: &web::Data<DbPool>) -> anyhow::Result<u
         })?;
     Ok(selected_user.scores.try_into()?)
 }
+pub fn remove_user_from_db(user: UserForm, pool: &web::Data<DbPool>) {
+    use self::users::dsl::*;
 
+    let db = pool.get().unwrap();
+    diesel::delete(users.filter((name.eq(user.name.clone())).and(second_name.eq(user.second_name))))
+        .execute(db.deref())
+        .unwrap();
+}
 pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &web::Data<DbPool>) -> anyhow::Result<(bool, TestLevel)> {
     use self::tests::dsl::*;
     let db = pool.get().unwrap();
@@ -263,6 +270,7 @@ pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &web::Data<DbPool>)
 #[cfg(test)]
 mod _tests {
     use super::*;
+    use lazy_static::lazy_static;
     use uuid::Uuid;
 
     const PASSWORD: &str = "password";
@@ -280,15 +288,6 @@ mod _tests {
             second_name,
             password,
         }
-    }
-
-    fn remove_user_from_db(user: UserForm) {
-        use self::users::dsl::*;
-
-        let db = DB.get().unwrap();
-        diesel::delete(users.filter((name.eq(user.name.clone())).and(second_name.eq(user.second_name))))
-            .execute(db.deref())
-            .unwrap();
     }
 
     #[test]
@@ -311,9 +310,9 @@ mod _tests {
         let db = web::Data::new(DB.clone());
         let user = generate_rand_user();
 
-        let registry_result = registry_new_user(user.clone(), db);
+        let registry_result = registry_new_user(user.clone(), db.clone());
 
-        remove_user_from_db(user);
+        remove_user_from_db(user, &db);
         assert!(registry_result.is_ok());
     }
 
@@ -324,9 +323,9 @@ mod _tests {
 
         registry_new_user(user.clone(), db.clone()).unwrap();
 
-        let check_result = check_if_user_exists(user.clone(), db).unwrap();
+        let check_result = check_if_user_exists(user.clone(), db.clone()).unwrap();
 
-        remove_user_from_db(user);
+        remove_user_from_db(user, &db);
         assert!(check_result);
     }
 
@@ -347,9 +346,9 @@ mod _tests {
 
         registry_new_user(user.clone(), db.clone()).unwrap();
 
-        let verify_password_result = verify_password(user.clone(), db).unwrap();
+        let verify_password_result = verify_password(user.clone(), db.clone()).unwrap();
 
-        remove_user_from_db(user);
+        remove_user_from_db(user, &db);
         assert!(verify_password_result);
     }
 
@@ -361,9 +360,9 @@ mod _tests {
         registry_new_user(user.clone(), db.clone()).unwrap();
 
         user.password = "Some incorrect password".to_string();
-        let verify_password_result = verify_password(user.clone(), db).unwrap();
+        let verify_password_result = verify_password(user.clone(), db.clone()).unwrap();
 
-        remove_user_from_db(user);
+        remove_user_from_db(user, &db);
         assert!(!verify_password_result);
     }
 
@@ -376,7 +375,7 @@ mod _tests {
 
         let scores = get_scores(&user, &db).unwrap();
 
-        remove_user_from_db(user);
+        remove_user_from_db(user, &db);
         assert_eq!(scores, 0);
     }
 
@@ -392,7 +391,7 @@ mod _tests {
 
         let scores = get_scores(&user, &db).unwrap();
 
-        remove_user_from_db(user);
+        remove_user_from_db(user, &db);
         assert_eq!(scores, rand_scores);
     }
 }
