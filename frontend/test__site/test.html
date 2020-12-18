@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/css/normalize.css">
+    <link rel="stylesheet" href="/test__site/test.css">
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,400;1,700&display=swap" rel="stylesheet">
     <title>Тест</title>
 </head>
 <body>
@@ -14,10 +17,41 @@
             <div class="test__title"><h1 class="test__title__text">Тест ГИБДД</h1></div>
 
             <form action="" method="POST">
-                <p class="question">Олександр Юсюк член ЛГБТ коммьюнити?</p>
-                <p class="result"><input type="radio" name="answer" value="1">Да</p>
-                <p class="result"><input type="radio" name="answer" value="0">Нет</p>
-                <p class="submit__test"><input type="submit" value="Отправить"></p>
+                <div class="questions">
+                    <p class="question">1. Можно ли обжаловать административное задержание, досмотр, а также изъятие вещей и документов, в том числе удостоверение водителя, талона о прохождении государственного технического осмотра?</p>
+                    <p class="result"><input type="radio" name="questionone" value="">Нельзя.</p>
+                    <p class="result"><input type="radio" name="questionone" value="yes">Можно.</p><br>
+
+                    <p class="question">2. Какого цвета должны быть проблесковые маячки транспортного средства, замыкающего колонну транспортных средств?</p>
+                    <p class="result"><input type="radio" name="questiontwo" value="">Только зёленого цвета.</p>
+                    <p class="result"><input type="radio" name="questiontwo" value="">Только зёленого и синего цвета.</p>
+                    <p class="result"><input type="radio" name="questiontwo" value="yes">Цвет проблесковых маячков должен соответствовать ответам 1 или 2.</p>
+                    <p class="result"><input type="radio" name="questiontwo" value="">Только синего и красного цвета.</p>
+                    <p class="result"><input type="radio" name="questiontwo" value="">Только красного цвета.</p><br>
+
+                    <p class="question">3. Какое максимальное количество человек разрешается перевозить в приспособленном для этого грузовом автомобиле, водитель которого имеет стаж более 3-х лет и удостоверение водителя категории "С"?</p>
+                    <p class="result"><input type="radio" name="questionthree" value="">До 5 человек.</p>
+                    <p class="result"><input type="radio" name="questionthree" value="">До 5 человек.</p>
+                    <p class="result"><input type="radio" name="questionthree" value="yes">До 8 человек.</p>
+                    <p class="result"><input type="radio" name="questionthree" value="">Количество пассажиров должно соответствовать количеству оборудованных для этой цели мест.</p><br>
+
+                    <p class="question">4. Разрешается ли занимать место для постоянного движения в колонне другим транспортным средствам?</p>
+                    <p class="result"><input type="radio" name="questionfour" value="yes">Запрещается.</p>
+                    <p class="result"><input type="radio" name="questionfour" value="">Разрешается только в светлое время суток.</p>
+                    <p class="result"><input type="radio" name="questionfour" value="">Разрешается на время до 30 секунд.</p>
+                    <p class="result"><input type="radio" name="questionfour" value="">Разрешается при наличии безопасной дистанции.</p><br>
+
+                    <p class="question">5. При каких перечисленных условиях учебная езда на дорогах разрешается?</p>
+                    <p class="result"><input type="radio" name="questionfive" value="">Только если лицу, обучающеиуся вождению автомобиля, не менее 16 лет и при наличии у него достаточных начальных навыков вождения.</p>
+                    <p class="result"><input type="radio" name="questionfive" value="yes">Только в присутствии обучающего лица.</p>
+                    <p class="result"><input type="radio" name="questionfive" value="">При условиях , указанных в ответах 1 и 2, а так же если водительский стаж обучающего не менее пяти лет.</p>
+                    <p class="result"><input type="radio" name="questionfive" value="yes">При условиях, указанных в ответах 1 и 2.</p>
+                </div>
+
+                <div class="endoftest">
+                    <p class="submit__test"><input type="submit" value="Отправить решение"></p>
+                    <a href="/index.html" class="go__back">Вернуться на главную страницу</a>
+                </div>
             </form>
 
         </div>

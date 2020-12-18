@@ -1,0 +1,43 @@
+*,
+*:before,
+*:after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Ubuntu', sans-serif;
+    background-color: skyblue;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: white;
+}
+
+.test__title__text {
+    text-align: center;
+}
+
+.question {
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.endoftest {
+    display: flex;
+    justify-content: space-between;
+}
+
+.submit__test {
+    margin-top: 10px;
+}
+
+.go__back {
+    border: 1px solid rgb(66, 64, 64);
+    border-radius: 5px;
+    text-decoration: none;
+    padding: 5px 5px;
+}

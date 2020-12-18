@@ -3,30 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,400;1,700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/normalize.css">
+    <link rel="stylesheet" href="/css/normalize.css">
+    <link rel="stylesheet" href="/registration/reg.css">
+    <link rel="stylesheet" href="/registration/">
     <script src="http://code.jquery.com/jquery-latest.js" type="text/javascript"></script>
     <title>ГИББД</title>
-
-    <!--SCRIPT start-->
-
-    <script type="text/javascript">
-        $(document).ready(function() {
-           $('a[href^="#"]').click(function () { 
-             elementClick = $(this).attr("href");
-             destination = $(elementClick).offset().top;
-             if($.browser.safari){
-               $('body').animate( { scrollTop: destination }, 1100 );
-             }else{
-               $('html').animate( { scrollTop: destination }, 1100 );
-             }
-             return false;
-           });
-         });
-    </script>
-
-    <!--SCRIPT end-->
 
     <!--SVG start-->
 
@@ -48,12 +31,56 @@
         <div class="header">
             <div class="wrapper">
                 <div class="navigation">
-                    <img src="img/logo.jpg" alt="Logo">
+                    <img src="/img/logo.jpg" alt="Logo">
                     <ul class="nav">
                         <li><a href="#">Главная</a></li>
                         <li><a href="#menu">О нас</a></li>
                         <li><a href="#contact">Контакты</a></li>
                     </ul>
+                    <div class="register__site">
+                        <button onclick="document.getElementById('id01').style.display='block'" style="width:auto;" class="button__title">Регистрация</button>
+
+                        <div id="id01" class="modal">
+                        
+                        <form class="modal-content animate" action="/action_page.php">
+                            <div class="imgcontainer">
+                            <span onclick="document.getElementById('id01').style.display='none'" class="close" title="Close Modal">×</span>
+                            </div>
+
+                            <div class="container">
+                            <label for="uname"><b>Придумайте Имя:</b></label>
+                            <input type="text" placeholder="Введите Имя" name="uname" required>
+
+                            <label for="email"><b>Ваш e-mail:</b></label>
+                            <input type="text" placeholder="Введите e-mail" name="email" required> 
+
+                            <label for="psw"><b>Придумайте пароль:</b></label>
+                            <input type="password" placeholder="Введите Пароль" name="psw" required>
+
+                            <label for="psw-repeat"><b>Повторите пароль:</b></label>
+                            <input type="password" placeholder="Введите пароль" name="psw-repeat" required>
+
+                            <label>
+                                <input type="checkbox" checked="checked" name="remember" style="margin-bottom:15px">Запомнить меня
+                            </label>
+                           
+                            <button type="submit">Зарегестрироваться</button>
+                            </div>
+
+                        </form>
+                        </div>
+
+                        <script>
+                        
+                        var modal = document.getElementById('id01');
+
+                        window.onclick = function(event) {
+                            if (event.target == modal) {
+                                modal.style.display = "none";
+                            }
+                        }
+                        </script>
+                    </div>
                 </div>
             </div>
         </div>
@@ -61,8 +88,8 @@
             <div class="wrapper">
                 <h1 class="title" >Лучший сайт во Вселенной!</h1>
                 <p class="description">Пройдите захватывающий тест, чтобы проверить свои знания!</p>
-                <a class="btn" href="test__site/test.html">Пройти тест</a>
-                <img class="banner__car" src="img/car.png" alt="Car">
+                <a class="btn" href="/test__site/test.html">Пройти тест</a>
+                <img class="banner__car" src="/img/car.png" alt="Car">
             </div>
         </div>
 
@@ -81,28 +108,28 @@
                 <div class="wrapper">
                     <div class="team__inner">
                         <div class="team__item">
-                            <img class="team__photo" src="img/team/team-1.jpg" alt="team-1">
+                            <img class="team__photo" src="/img/team/team-1.jpg" alt="team-1">
                             <div class="team__name">Антон Павлюковец</div>
                             <div class="team__prof">Тестировщик</div>
                             <div class="team__text">Незаменимый член нашей группы. Имея большой багаж знаний и долгие лета практики за спиной может с легкостью найти ошибку и проверить работоспособность продукта.</div>
                         </div>
 
                         <div class="team__item">
-                            <img class="team__photo" src="img/team/team-2.jpg" alt="team-1">
+                            <img class="team__photo" src="/img/team/team-2.jpg" alt="team-1">
                             <div class="team__name">Виктор Самойленко</div>
                             <div class="team__prof">Менеджер проекта</div>
                             <div class="team__text">Человек прочной закалки, благодаря которому все грядущие и теперешние задания выполняются в срок.</div>
                         </div>
 
                         <div class="team__item">
-                            <img class="team__photo" src="img/team/team-3.jpg" alt="team-1">
+                            <img class="team__photo" src="/img/team/team-3.jpg" alt="team-1">
                             <div class="team__name">Олександр Юсюк</div>
                             <div class="team__prof">Архитектор</div>
                             <div class="team__text">Мозг нашей команды. Всегда с удовольствием брался за самые сложные и невыполнимые задания, бескорыстно их выполняя. Впрочем, за это мы его и взяли.</div>
                         </div>
 
                         <div class="team__item">
-                            <img class="team__photo" src="img/team/team-4.jpg" alt="team-1">
+                            <img class="team__photo" src="/img/team/team-4.jpg" alt="team-1">
                             <div class="team__name">Константин Шашин</div>
                             <div class="team__prof">Технический редактор</div>
                             <div class="team__text">Человек-дизайн. Отвечает за внешнюю составляющую продукта, первичный функционал и его быстродействие.</div>
@@ -123,9 +150,9 @@
                         </div>
                         <div class="footer__social">
                             <a class="footer__social__icon" href="#">
-                                <img class="icon" src="img/icons/instagram.png" alt="" height="50px" width="50px">
-                                <img class="icon" src="img/icons/telegram.png" alt="" height="50px" width="50px">
-                                <img class="icon" src="img/icons/odnoklassniki.png" alt="" height="50px" width="50px">
+                                <img class="icon" src="/img/icons/instagram.png" alt="" height="50px" width="50px">
+                                <img class="icon" src="/img/icons/telegram.png" alt="" height="50px" width="50px">
+                                <img class="icon" src="/img/icons/odnoklassniki.png" alt="" height="50px" width="50px">
                             </a>
                         </div>
                     </div>
@@ -133,6 +160,26 @@
             </div>
 
         <!--FOOTER end-->
+
+        
+        <!--SCRIPT start-->
+
+        <script type="text/javascript">
+            $(document).ready(function() {
+            $('a[href^="#"]').click(function () { 
+                elementClick = $(this).attr("href");
+                destination = $(elementClick).offset().top;
+                if($.browser.safari){
+                $('body').animate( { scrollTop: destination }, 1100 );
+                }else{
+                $('html').animate( { scrollTop: destination }, 1100 );
+                }
+                return false;
+            });
+            });
+        </script>
+
+        <!--SCRIPT end-->
         
     </body>
 </html>
