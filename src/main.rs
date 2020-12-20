@@ -4,10 +4,11 @@ use actix_web::{
     App, HttpServer,
 };
 use log::info;
+use openssl::ssl::{SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod};
 
 use std::env;
 
-use lib::{db, web};
+use lib::db::establish_connection;
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
@@ -15,9 +16,9 @@ async fn main() -> anyhow::Result<()> {
 
     env_logger::init();
 
-    let connection_pool = db::establish_connection();
+    let connection_pool = establish_connection();
 
-    let tls_builder = web::tls_builder()?;
+    let tls_builder = tls_builder()?;
 
     info!("Successfully connected to the DB");
 
@@ -26,17 +27,26 @@ async fn main() -> anyhow::Result<()> {
             .wrap(Logger::new("%a %t %r %b %s %T"))
             .wrap(middleware::Compress::new(http::ContentEncoding::Identity))
             .data(connection_pool.clone())
-            .route("/user", actix_web::web::post().to(web::sing_up))
-           .service(web::sing_in)
-          //  .service(web::sing_up)
-            .service(web::check_answer_with_user)
-            .service(web::get_test)
-            .service(web::check_answer)
-            .service(web::healthy)
+            .configure(services_config)
     })
-     //.bind_openssl(server_addr, tls_builder)?
-        .bind(server_addr)?
-        .run()
+    .bind_openssl(server_addr, tls_builder)?
+    .run()
     .await
     .map_err(|err| err.into())
+}
+
+pub fn services_config(cfg: &mut actix_web::web::ServiceConfig) {
+    cfg.service(lib::sing_up)
+        .service(lib::sing_in)
+        .service(lib::check_answer_with_user)
+        .service(lib::get_test)
+        .service(lib::check_answer)
+        .service(lib::healthy);
+}
+
+pub fn tls_builder() -> anyhow::Result<SslAcceptorBuilder> {
+    let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
+    builder.set_private_key_file("cert/key.pem", SslFiletype::PEM)?;
+    builder.set_certificate_chain_file("cert/cert.pem")?;
+    Ok(builder)
 }
