@@ -1,4 +1,14 @@
 table! {
+    tests (id) {
+        id -> Integer,
+        description -> Text,
+        answers -> Text,
+        image -> Binary,
+        right_answer_id -> Integer,
+    }
+}
+
+table! {
     users (id) {
         id -> Integer,
         name -> Text,
@@ -7,12 +17,5 @@ table! {
         scores -> Integer,
     }
 }
-table! {
-    tests (id) {
-        id -> Integer,
-        level -> Integer,
-        description -> Text,
-        answers -> Text,
-        right_answer_id -> Integer,
-    }
-}
+
+allow_tables_to_appear_in_same_query!(tests, users,);

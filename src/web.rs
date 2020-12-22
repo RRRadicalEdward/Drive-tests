@@ -7,6 +7,8 @@ use crate::{
     model::UserForm,
 };
 
+const SCORES_FOR_RIGHT_ANSWER: u32 = 5;
+
 #[post("/user")]
 pub async fn sing_up(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse> {
     let user = user.into_inner();
@@ -112,19 +114,16 @@ pub async fn get_test(pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse
 #[get("/test?test_id&answer_id")]
 pub async fn check_answer(path: web::Path<(u32, u32)>, pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse> {
     let (test_id, answer_id) = path.0;
-    let (check_result, test_level) = web::block(move || db::check_test_answer(test_id, answer_id, &pool))
+    let check_result = web::block(move || db::check_test_answer(test_id, answer_id, &pool))
         .await
         .map_err(|err| {
             error!("check_if_user_exists error - {}", err);
             HttpResponse::InternalServerError().finish();
         })?;
     match check_result {
-        true => {
-            let scores = test_level.to_scores();
-            Ok(HttpResponse::Ok()
-                .header("scores", scores.to_string())
-                .body("The answer is correct"))
-        }
+        true => Ok(HttpResponse::Ok()
+            .header("scores", SCORES_FOR_RIGHT_ANSWER.to_string())
+            .body("The answer is correct")),
         false => Ok(HttpResponse::Ok().header("scores", "0").body("The answer is correct")),
     }
 }
@@ -164,7 +163,7 @@ pub async fn check_answer_with_user(
     }
 
     let pool_clone = pool.clone();
-    let (check_result, test_level) = web::block(move || db::check_test_answer(test_id, answer_id, &pool_clone))
+    let check_result = web::block(move || db::check_test_answer(test_id, answer_id, &pool_clone))
         .await
         .map_err(|err| {
             error!("check_if_user_exists error - {}", err);
@@ -173,17 +172,17 @@ pub async fn check_answer_with_user(
 
     let user_clone = user.clone();
     let pool_clone = pool.clone();
+
     match check_result {
         true => {
-            let scores = test_level.to_scores();
-            web::block(move || db::add_scores(&user_clone, scores, &pool_clone))
+            web::block(move || db::add_scores(&user_clone, SCORES_FOR_RIGHT_ANSWER, &pool_clone))
                 .await
                 .map_err(|err| {
                     error!("failed to add new scores after passing a test successfully - {}", err);
                     HttpResponse::InternalServerError().finish();
                 })?;
             Ok(HttpResponse::Ok()
-                .header("scores", scores.to_string())
+                .header("scores", SCORES_FOR_RIGHT_ANSWER.to_string())
                 .body("The answer is correct"))
         }
         false => Ok(HttpResponse::Ok().header("scores", "0").body("The answer is correct")),

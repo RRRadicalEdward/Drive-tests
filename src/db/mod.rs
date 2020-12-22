@@ -15,6 +15,7 @@ use actix_web::web;
 
 use std::{
     convert::{TryFrom, TryInto},
+    env,
     fs::File,
     io::Read,
     ops::Deref,
@@ -24,11 +25,11 @@ use std::{
 pub mod model;
 pub mod schema;
 
-use crate::db::model::TestLevel;
 use model::UserForm;
 use schema::{tests, users};
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
+pub const DEFAULT_DATABASE_URL: &str = "drive_tests_db.db";
 
 #[derive(Debug)]
 struct ConnectionCustomizer {
@@ -58,8 +59,16 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCu
 }
 
 pub fn establish_connection() -> DbPool {
-    let database_path = "drive_tests_db.db";
-    let manager = ConnectionManager::<SqliteConnection>::new(database_path);
+    let database_url = match env::var("DATABASE_URL") {
+        Ok(database_url) => database_url,
+        Err(_) => {
+            env::set_var("DATABASE_URL", DEFAULT_DATABASE_URL);
+            DEFAULT_DATABASE_URL.to_string()
+        }
+    };
+
+    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
+
     r2d2::Pool::builder()
         .max_size(16)
         .connection_customizer(Box::new(ConnectionCustomizer {
@@ -251,7 +260,7 @@ pub fn remove_user_from_db(user: UserForm, pool: &web::Data<DbPool>) {
         .execute(db.deref())
         .unwrap();
 }
-pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &web::Data<DbPool>) -> anyhow::Result<(bool, TestLevel)> {
+pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &web::Data<DbPool>) -> anyhow::Result<bool> {
     use self::tests::dsl::*;
     let db = pool.get().unwrap();
 
@@ -263,8 +272,7 @@ pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &web::Data<DbPool>)
         .filter(id.eq(test_id))
         .first::<model::Test>(db.deref())
         .map_err(|err| anyhow!("failed to select test with {} id: {}", test_id, err))?;
-    let test_level = TestLevel::new(selected_test.level.try_into()?)?;
-    Ok((selected_test.right_answer_id == answer_id, test_level))
+    Ok(selected_test.right_answer_id == answer_id)
 }
 
 #[cfg(test)]

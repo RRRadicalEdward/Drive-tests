@@ -9,9 +9,9 @@ CREATE TABLE "users" (
 
 CREATE TABLE "tests" (
                          "id"	INTEGER NOT NULL UNIQUE,
-                         "level"	INTEGER NOT NULL,
                          "description"	TEXT NOT NULL,
                          "answers"	TEXT NOT NULL,
                          "right_answer_id"	INTEGER NOT NULL,
+                         "images" BLOB,
                          PRIMARY KEY("id" AUTOINCREMENT)
 );

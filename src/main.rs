@@ -8,19 +8,28 @@ use openssl::ssl::{SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod};
 
 use std::env;
 
-use lib::db::establish_connection;
+use lib::db::{establish_connection, DEFAULT_DATABASE_URL};
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::init();
+
+    if env::var("DATABASE_URL").is_err() {
+        env::set_var("DATABASE_URL", DEFAULT_DATABASE_URL);
+    }
+
     let server_addr = env::args().nth(1).unwrap_or_else(|| "127.0.0.1:5050".to_string());
 
-    env_logger::init();
+    info!("Running server on {}", server_addr);
 
     let connection_pool = establish_connection();
 
     let tls_builder = tls_builder()?;
 
-    info!("Successfully connected to the DB");
+    info!(
+        "Successfully connected to the DB on {}",
+        env::var("DATABASE_URL").unwrap()
+    );
 
     HttpServer::new(move || {
         App::new()
