@@ -12,6 +12,6 @@ CREATE TABLE "tests" (
                          "description"	TEXT NOT NULL,
                          "answers"	TEXT NOT NULL,
                          "right_answer_id"	INTEGER NOT NULL,
-                         "images" BLOB,
+                         "image" BLOB,
                          PRIMARY KEY("id" AUTOINCREMENT)
 );

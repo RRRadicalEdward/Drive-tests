@@ -3,8 +3,8 @@ table! {
         id -> Integer,
         description -> Text,
         answers -> Text,
-        image -> Binary,
         right_answer_id -> Integer,
+        image -> Nullable<Binary>,
     }
 }
 

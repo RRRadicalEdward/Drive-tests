@@ -1,6 +1,6 @@
-/target
-/.vscode
-.idea
-Cargo.lock
 drive_tests_db.db-shm
 drive_tests_db.db-wal
+Cargo.lock
+.idea
+/target
+/.vscode

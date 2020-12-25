@@ -99,14 +99,10 @@ pub async fn get_test(pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse
         HttpResponse::InternalServerError().finish()
     })?;
 
-    let answers_json = serde_json::to_value(test.answers.clone()).map_err(|err| {
-        error!("failed to parse {} test answers to json - {}", test.id, err);
-        HttpResponse::InternalServerError().finish()
-    })?;
-
     let response = HttpResponse::Ok().content_type("application/json").json(json!({
         "description": test.description,
-        "answers"    : answers_json,
+        "answers"    : test.answers,
+
     }));
     Ok(response)
 }

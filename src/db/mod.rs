@@ -1,3 +1,4 @@
+use actix_web::web;
 use diesel::{
     connection::SimpleConnection,
     expression::dsl::{count, exists},
@@ -7,11 +8,10 @@ use diesel::{
     sqlite::SqliteConnection,
     BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl,
 };
+use log::{debug, info};
 use r2d2::Pool;
 use rand::rngs::OsRng;
 use rsa::{pem, PaddingScheme, PublicKey, RSAPrivateKey, RSAPublicKey};
-
-use actix_web::web;
 
 use std::{
     convert::{TryFrom, TryInto},
@@ -19,13 +19,14 @@ use std::{
     fs::File,
     io::Read,
     ops::Deref,
+    path::Path,
     time::Duration,
 };
 
 pub mod model;
 pub mod schema;
 
-use model::UserForm;
+use model::{Test, TestForm, UserForm};
 use schema::{tests, users};
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
@@ -54,6 +55,7 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCu
             command.push_str(&format!("PRAGMA busy_timeout = {};", d.as_millis()))
         }
         conn.batch_execute(&command).map_err(diesel::r2d2::Error::QueryError)?;
+
         Ok(())
     }
 }
@@ -137,6 +139,7 @@ fn encrypt_password(password: String) -> anyhow::Result<String> {
     encrypted_password.iter().for_each(|&num| {
         encrypted_password_hex.push_str(&format!("{:02x}", num));
     });
+
     Ok(encrypted_password_hex)
 }
 
@@ -179,6 +182,7 @@ pub fn verify_password(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Resul
         })?;
 
     let decrypted_password = decrypt_password(selected_user.password)?;
+
     Ok(decrypted_password == user.password)
 }
 pub fn get_test(pool: web::Data<DbPool>) -> anyhow::Result<model::Test> {
@@ -197,6 +201,7 @@ pub fn get_test(pool: web::Data<DbPool>) -> anyhow::Result<model::Test> {
         .filter(id.eq(rand_test as i32))
         .first::<model::Test>(db.deref())
         .map_err(|err| anyhow!("failed to get rand test - {}", err))?;
+
     Ok(test)
 }
 
@@ -250,6 +255,7 @@ pub fn get_scores(user: &UserForm, pool: &web::Data<DbPool>) -> anyhow::Result<u
                 err
             )
         })?;
+
     Ok(selected_user.scores.try_into()?)
 }
 pub fn remove_user_from_db(user: UserForm, pool: &web::Data<DbPool>) {
@@ -272,7 +278,48 @@ pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &web::Data<DbPool>)
         .filter(id.eq(test_id))
         .first::<model::Test>(db.deref())
         .map_err(|err| anyhow!("failed to select test with {} id: {}", test_id, err))?;
+
     Ok(selected_test.right_answer_id == answer_id)
+}
+
+pub fn insert_tests_to_db(path: &Path, db: &DbPool) -> anyhow::Result<()> {
+    use schema::tests::dsl::*;
+
+    debug!("There are new tests to be inserted");
+    let mut file = File::open(path)?;
+
+    let mut buffer = String::new();
+    file.read_to_string(&mut buffer)?;
+
+    let test_forms = serde_json::from_str::<Vec<TestForm>>(&buffer)?;
+
+    let mut tests_vec: Vec<Test> = Vec::with_capacity(test_forms.len());
+
+    for test_model in test_forms.into_iter() {
+        let test = test_model.into_test()?;
+        tests_vec.push(test);
+    }
+
+    let db = db.get().unwrap();
+
+    for test in tests_vec.into_iter() {
+        match insert_into(tests)
+            .values(&(
+                description.eq(test.description),
+                answers.eq(test.answers),
+                right_answer_id.eq(test.right_answer_id),
+                image.eq(test.image),
+            ))
+            .execute(db.deref())
+        {
+            Ok(0) => return Err(anyhow!("Failed to insert a row to the Test table")),
+            Err(err) => return Err(err.into()),
+            Ok(_) => {}
+        }
+    }
+
+    info!("The new tests were inserted successfully");
+    Ok(())
 }
 
 #[cfg(test)]
