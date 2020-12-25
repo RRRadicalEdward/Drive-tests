@@ -87,7 +87,7 @@ pub fn registry_new_user(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Res
 
     if check_if_user_exists(user.clone(), pool.clone())? {
         return Err(anyhow!(format!(
-            "{} {} user already exists",
+            "[{} {}] user already exists",
             user.name, user.second_name
         )));
     }
@@ -174,7 +174,7 @@ pub fn verify_password(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Resul
         .first::<model::User>(db.deref())
         .map_err(|err| {
             anyhow!(
-                "failed to find in {} {} user in the DB - {}",
+                "Failed to find in {} {} user in the DB - {}",
                 user.name,
                 user.second_name,
                 err
@@ -192,7 +192,7 @@ pub fn get_test(pool: web::Data<DbPool>) -> anyhow::Result<model::Test> {
     let count = tests
         .select(count(id))
         .execute(db.deref())
-        .map_err(|err| anyhow!("failed to get tests count - {}", err))?;
+        .map_err(|err| anyhow!("Failed to get tests count - {}", err))?;
 
     let rand_test = rand::random::<usize>() % count;
 
@@ -215,7 +215,7 @@ pub fn add_scores(user: &UserForm, add_scores: u32, pool: &web::Data<DbPool>) ->
         .first::<model::User>(db.deref())
         .map_err(|err| {
             anyhow!(
-                "failed to find in {} {} user in the DB - {}",
+                "Failed to find in {} {} user in the DB - {}",
                 user.name,
                 user.second_name,
                 err
@@ -229,7 +229,7 @@ pub fn add_scores(user: &UserForm, add_scores: u32, pool: &web::Data<DbPool>) ->
         .execute(db.deref())
         .map_err(|err| {
             anyhow!(
-                "failed to find in {} {} user in the DB - {}",
+                "Failed to find in {} {} user in the DB - {}",
                 user.name,
                 user.second_name,
                 err
@@ -249,7 +249,7 @@ pub fn get_scores(user: &UserForm, pool: &web::Data<DbPool>) -> anyhow::Result<u
         .first::<model::User>(db.deref())
         .map_err(|err| {
             anyhow!(
-                "failed to find in {} {} user in the DB - {}",
+                "Failed to find in {} {} user in the DB - {}",
                 user.name,
                 user.second_name,
                 err
@@ -277,7 +277,7 @@ pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &web::Data<DbPool>)
         .order(id)
         .filter(id.eq(test_id))
         .first::<model::Test>(db.deref())
-        .map_err(|err| anyhow!("failed to select test with {} id: {}", test_id, err))?;
+        .map_err(|err| anyhow!("Failed to select test with {} id: {}", test_id, err))?;
 
     Ok(selected_test.right_answer_id == answer_id)
 }
@@ -286,6 +286,7 @@ pub fn insert_tests_to_db(path: &Path, db: &DbPool) -> anyhow::Result<()> {
     use schema::tests::dsl::*;
 
     debug!("There are new tests to be inserted");
+
     let mut file = File::open(path)?;
 
     let mut buffer = String::new();
@@ -357,7 +358,7 @@ mod _tests {
         let encrypted_password = encrypt_password(password.clone()).unwrap();
         let decrypted_password = decrypt_password(encrypted_password).unwrap();
 
-        assert_eq!(password, decrypted_password);
+        assert_eq!(decrypted_password, password);
     }
 
     #[test]

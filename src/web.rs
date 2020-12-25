@@ -19,18 +19,25 @@ pub async fn sing_up(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> acti
     );
 
     let user_clone = user.clone();
-    web::block(move || db::registry_new_user(user_clone, pool)) // TODO: return the user already exist if ethe user already exist in the DB
+    web::block(move || db::registry_new_user(user_clone, pool)) // TODO: return the user already exist if the user already exist in the DB
         .await
         .map_err(|err| {
-            error!("Error while registering a new user - {}", err);
+            error!(
+                "{}:{} An error occurred while registering a new user - {}",
+                file!(),
+                line!(),
+                err
+            );
             HttpResponse::InternalServerError().finish()
         })?;
 
     debug!("Successfully registry {} {} user", user.name, user.second_name);
 
+    let UserForm { name, second_name, .. } = user;
+
     let http_response = HttpResponse::Created().content_type("application/json").json(json!({
-        "name" : user.name,
-        "second_name" : user.second_name,
+        "name" : name,
+        "second_name" : second_name,
         "scores" : "0"
     }));
 
@@ -50,7 +57,7 @@ pub async fn sing_in(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> acti
     let check_passed = web::block(move || db::check_if_user_exists(user_clone, pool_clone))
         .await
         .map_err(|err| {
-            error!("An error occurred while singing in the user - {}", err);
+            error!("{}:{} Checking if a user exists error - {}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish()
         })?;
 
@@ -65,7 +72,7 @@ pub async fn sing_in(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> acti
     let verify_password_passed = web::block(move || db::verify_password(user_clone, pool_clone))
         .await
         .map_err(|err| {
-            error!("An error occurred while verifying the user - {}", err);
+            error!("{}:{} Verifying an user password failed - {}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish()
         })?;
 
@@ -80,14 +87,21 @@ pub async fn sing_in(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> acti
     let scores = web::block(move || db::get_scores(&user_clone, &pool_clone))
         .await
         .map_err(|err| {
-            error!("An error occurred while getting scores - {}", err);
+            error!(
+                "{}:{} An error occurred while getting a user scores - {}",
+                file!(),
+                line!(),
+                err
+            );
             HttpResponse::InternalServerError().finish()
         })?;
 
+    let UserForm { name, second_name, .. } = user;
+
     let http_response = HttpResponse::Found().content_type("application/json").json(json!({
-       "name"  : user.name.clone(),
-       "second_name": user.second_name.to_string(),
-       "scores"     : scores.to_string(),
+       "name"  : name,
+       "second_name": second_name,
+       "scores"     : scores,
     }));
 
     Ok(http_response)
@@ -96,7 +110,7 @@ pub async fn sing_in(user: web::Json<UserForm>, pool: web::Data<DbPool>) -> acti
 #[get("/test")]
 pub async fn get_test(pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse> {
     let test = web::block(move || db::get_test(pool)).await.map_err(|err| {
-        error!("get test error - {}", err);
+        error!("{}:{} Getting a test failed - {}", file!(), line!(), err);
         HttpResponse::InternalServerError().finish()
     })?;
 
@@ -123,7 +137,7 @@ pub async fn check_answer(path: web::Path<(u32, u32)>, pool: web::Data<DbPool>) 
     let check_result = web::block(move || db::check_test_answer(test_id, answer_id, &pool))
         .await
         .map_err(|err| {
-            error!("check_if_user_exists error - {}", err);
+            error!("{}:{} Checking a test answer failed - {}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish();
         })?;
 
@@ -149,7 +163,7 @@ pub async fn check_answer_with_user(
     let check_passed = web::block(move || db::check_if_user_exists(user_clone, pool_clone))
         .await
         .map_err(|err| {
-            error!("check_if_user_exists error - {}", err);
+            error!("{}:{} Checking if a user exists error - {}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish();
         })?;
 
@@ -162,7 +176,7 @@ pub async fn check_answer_with_user(
     let verify_passed = web::block(move || db::verify_password(user_clone, pool_clone))
         .await
         .map_err(|err| {
-            error!("Checking if a user exists error - {}", err);
+            error!("{}:{} Verifying an user password failed - {}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish();
         })?;
 
@@ -174,26 +188,31 @@ pub async fn check_answer_with_user(
     let check_result = web::block(move || db::check_test_answer(test_id, answer_id, &pool_clone))
         .await
         .map_err(|err| {
-            error!("check_if_user_exists error - {}", err);
+            error!("{}:{} Checking a test answer failed - {}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish();
         })?;
 
-    let user_clone = user.clone();
-    let pool_clone = pool.clone();
-
     match check_result {
         true => {
+            let user_clone = user.clone();
+            let pool_clone = pool.clone();
+
             web::block(move || db::add_scores(&user_clone, SCORES_FOR_RIGHT_ANSWER, &pool_clone))
                 .await
                 .map_err(|err| {
-                    error!("failed to add new scores after passing a test successfully - {}", err);
+                    error!("{}:{} Failed to add new scores - {}", file!(), line!(), err);
                     HttpResponse::InternalServerError().finish();
                 })?;
-            Ok(HttpResponse::Ok()
-                .header("scores", SCORES_FOR_RIGHT_ANSWER.to_string())
-                .body("The answer is correct"))
+
+            Ok(HttpResponse::Ok().json(json!({
+                "description": "The answer is correct",
+                "scores": SCORES_FOR_RIGHT_ANSWER,
+            })))
         }
-        false => Ok(HttpResponse::Ok().header("scores", "0").body("The answer is correct")),
+        false => Ok(HttpResponse::Ok().json(json!({
+             "description": "The answer is incorrect",
+            "scores": 0,
+        }))),
     }
 }
 

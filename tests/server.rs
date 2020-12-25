@@ -68,7 +68,7 @@ async fn create_user() {
     let body = response.take_body();
     let body = body.as_ref().unwrap();
 
-    assert_eq!(Body::from(expected_json_body), *body);
+    assert_eq!(*body, Body::from(expected_json_body));
 }
 
 #[actix_rt::test]
@@ -80,7 +80,7 @@ async fn log_in_after_create_the_user() {
     let expected_json_body = json!({
           "name" : user.name.clone(),
            "second_name" : user.second_name.clone(),
-           "scores" : "0",
+           "scores" : 0,
     });
 
     let request = TestRequest::post()
@@ -107,7 +107,7 @@ async fn log_in_after_create_the_user() {
     let body = response.take_body();
     let body = body.as_ref().unwrap();
 
-    assert_eq!(Body::from(expected_json_body), *body);
+    assert_eq!(*body, Body::from(expected_json_body));
 }
 
 #[actix_rt::test]
