@@ -6,6 +6,7 @@ use crate::{
     db::{self, DbPool},
     model::UserForm,
 };
+use image::EncodableLayout;
 
 const SCORES_FOR_RIGHT_ANSWER: u32 = 5;
 
@@ -99,27 +100,38 @@ pub async fn get_test(pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse
         HttpResponse::InternalServerError().finish()
     })?;
 
+    let mut image = None;
+    if test.image.is_some() {
+        let image_base64 = base64::encode(test.image.unwrap().as_bytes());
+        image = Some(image_base64);
+    }
+
     let response = HttpResponse::Ok().content_type("application/json").json(json!({
+        "id": test.id,
         "description": test.description,
         "answers"    : test.answers,
-
+        "image": image,
     }));
+
     Ok(response)
 }
 
 #[get("/test?test_id&answer_id")]
 pub async fn check_answer(path: web::Path<(u32, u32)>, pool: web::Data<DbPool>) -> actix_web::Result<HttpResponse> {
     let (test_id, answer_id) = path.0;
+
     let check_result = web::block(move || db::check_test_answer(test_id, answer_id, &pool))
         .await
         .map_err(|err| {
             error!("check_if_user_exists error - {}", err);
             HttpResponse::InternalServerError().finish();
         })?;
+
     match check_result {
         true => Ok(HttpResponse::Ok()
             .header("scores", SCORES_FOR_RIGHT_ANSWER.to_string())
             .body("The answer is correct")),
+
         false => Ok(HttpResponse::Ok().header("scores", "0").body("The answer is correct")),
     }
 }
@@ -150,7 +162,7 @@ pub async fn check_answer_with_user(
     let verify_passed = web::block(move || db::verify_password(user_clone, pool_clone))
         .await
         .map_err(|err| {
-            error!("check_if_user_exists error - {}", err);
+            error!("Checking if a user exists error - {}", err);
             HttpResponse::InternalServerError().finish();
         })?;
 
