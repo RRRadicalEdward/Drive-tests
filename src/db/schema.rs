@@ -1,17 +1,21 @@
 table! {
+    tests (id) {
+        id -> Integer,
+        description -> Text,
+        answers -> Text,
+        right_answer_id -> Integer,
+        image -> Nullable<Binary>,
+    }
+}
+
+table! {
     users (id) {
         id -> Integer,
-        name -> Varchar,
-        second_name -> Varchar,
-        password -> Longtext,
+        name -> Text,
+        second_name -> Text,
+        password -> Text,
         scores -> Integer,
     }
 }
-table! {
-    tests (id) {
-        id -> Integer,
-        level -> Integer,
-        description -> Text,
-        answers -> Text,
-    }
-}
+
+allow_tables_to_appear_in_same_query!(tests, users,);
