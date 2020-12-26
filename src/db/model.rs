@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::db::schema::{tests, users};
 
-#[derive(Queryable, PartialEq, Debug, Deserialize, Insertable)]
+#[derive(Queryable, Deserialize, Insertable)]
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
@@ -13,7 +13,7 @@ pub struct User {
     pub scores: i32,
 }
 
-#[derive(Queryable, PartialEq, Debug, Deserialize, Insertable)]
+#[derive(Queryable, Deserialize, Insertable)]
 #[table_name = "tests"]
 pub struct Test {
     pub id: i32,
@@ -23,14 +23,14 @@ pub struct Test {
     pub image: Option<Vec<u8>>,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct UserForm {
     pub name: String,
     pub second_name: String,
     pub password: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 pub struct TestForm {
     pub description: String,
     pub answers: Vec<String>,

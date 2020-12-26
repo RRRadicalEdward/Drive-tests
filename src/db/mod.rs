@@ -1,7 +1,7 @@
-use actix_web::web;
+use actix_web::web::Data;
 use diesel::{
     connection::SimpleConnection,
-    expression::dsl::{count, exists},
+    expression::dsl::exists,
     insert_into,
     r2d2::{ConnectionManager, CustomizeConnection},
     select,
@@ -82,7 +82,7 @@ pub fn establish_connection() -> DbPool {
         .expect("Failed to crate DB pool")
 }
 
-pub fn registry_new_user(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Result<()> {
+pub fn registry_new_user(user: UserForm, pool: Data<DbPool>) -> anyhow::Result<()> {
     use schema::users::dsl::*;
 
     if check_if_user_exists(user.clone(), pool.clone())? {
@@ -111,7 +111,7 @@ pub fn registry_new_user(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Res
     }
 }
 
-pub fn check_if_user_exists(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Result<bool> {
+pub fn check_if_user_exists(user: UserForm, pool: Data<DbPool>) -> anyhow::Result<bool> {
     use schema::users::dsl::*;
 
     let db = pool.get().unwrap();
@@ -163,7 +163,7 @@ fn decrypt_password(encrypted_password_hex: String) -> anyhow::Result<String> {
     Ok(decrypted_password)
 }
 
-pub fn verify_password(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Result<bool> {
+pub fn verify_password(user: UserForm, pool: Data<DbPool>) -> anyhow::Result<bool> {
     use self::users::dsl::*;
 
     let db = pool.get().unwrap();
@@ -185,27 +185,27 @@ pub fn verify_password(user: UserForm, pool: web::Data<DbPool>) -> anyhow::Resul
 
     Ok(decrypted_password == user.password)
 }
-pub fn get_test(pool: web::Data<DbPool>) -> anyhow::Result<model::Test> {
+pub fn get_test(pool: Data<DbPool>) -> anyhow::Result<model::Test> {
     use self::tests::dsl::*;
 
     let db = pool.get().unwrap();
-    let count = tests
-        .select(count(id))
-        .execute(db.deref())
-        .map_err(|err| anyhow!("Failed to get tests count - {}", err))?;
+    let count: u32 = tests
+        .count()
+        .get_result::<i64>(db.deref())
+        .map_err(|err| anyhow!("Failed to get tests count - {}", err))? as u32;
 
-    let rand_test = rand::random::<usize>() % count;
+    let rand_test: i32 = (rand::random::<u32>() % count) as i32 + 1;
 
     let test = tests
         .order(id)
-        .filter(id.eq(rand_test as i32))
+        .filter(id.eq(rand_test))
         .first::<model::Test>(db.deref())
-        .map_err(|err| anyhow!("failed to get rand test - {}", err))?;
+        .map_err(|err| anyhow!("Failed to get a rand test - {}", err))?;
 
     Ok(test)
 }
 
-pub fn add_scores(user: &UserForm, add_scores: u32, pool: &web::Data<DbPool>) -> anyhow::Result<()> {
+pub fn add_scores(user: &UserForm, add_scores: u32, pool: &Data<DbPool>) -> anyhow::Result<()> {
     use self::users::dsl::*;
     let db = pool.get().unwrap();
 
@@ -239,7 +239,7 @@ pub fn add_scores(user: &UserForm, add_scores: u32, pool: &web::Data<DbPool>) ->
     Ok(())
 }
 
-pub fn get_scores(user: &UserForm, pool: &web::Data<DbPool>) -> anyhow::Result<u32> {
+pub fn get_scores(user: &UserForm, pool: &Data<DbPool>) -> anyhow::Result<u32> {
     use self::users::dsl::*;
     let db = pool.get().unwrap();
 
@@ -258,7 +258,7 @@ pub fn get_scores(user: &UserForm, pool: &web::Data<DbPool>) -> anyhow::Result<u
 
     Ok(selected_user.scores.try_into()?)
 }
-pub fn remove_user_from_db(user: UserForm, pool: &web::Data<DbPool>) {
+pub fn remove_user_from_db(user: UserForm, pool: &Data<DbPool>) {
     use self::users::dsl::*;
 
     let db = pool.get().unwrap();
@@ -266,7 +266,7 @@ pub fn remove_user_from_db(user: UserForm, pool: &web::Data<DbPool>) {
         .execute(db.deref())
         .unwrap();
 }
-pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &web::Data<DbPool>) -> anyhow::Result<bool> {
+pub fn check_test_answer(test_id: u32, answer_id: u32, pool: &Data<DbPool>) -> anyhow::Result<bool> {
     use self::tests::dsl::*;
     let db = pool.get().unwrap();
 
@@ -326,6 +326,7 @@ pub fn insert_tests_to_db(path: &Path, db: &DbPool) -> anyhow::Result<()> {
 #[cfg(test)]
 mod _tests {
     use super::*;
+    use actix_web::web;
     use lazy_static::lazy_static;
     use uuid::Uuid;
 
