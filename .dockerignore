@@ -1,0 +1,11 @@
+.env
+target/
+tests/
+Dockerfile
+migrations/
+.travis.yml
+ci/
+frontend/
+README.md
+drive_tests_db.db-shm
+drive_tests_db.db-wal

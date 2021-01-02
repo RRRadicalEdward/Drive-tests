@@ -7,19 +7,17 @@ use log::{error, info};
 use std::{env, path::Path};
 
 use lib::{
-    db::{establish_connection, insert_tests_to_db, DEFAULT_DATABASE_URL},
+    db::{establish_connection, insert_tests_to_db},
     utils,
 };
+
+const DEFAULT_IP_ADDR: &str = "127.0.0.1:5050";
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
-    if env::var("DATABASE_URL").is_err() {
-        env::set_var("DATABASE_URL", DEFAULT_DATABASE_URL);
-    }
-
-    let server_addr = "127.0.0.1:5050";
+    let server_addr = env::var("SERVER_IP_ADDR").unwrap_or_else(|_| DEFAULT_IP_ADDR.to_string());
 
     info!("Running server on {}", server_addr);
 
@@ -29,11 +27,12 @@ async fn main() -> anyhow::Result<()> {
         let path_to_tests = env::args().nth(1).unwrap();
         let path = Path::new(path_to_tests.as_str());
 
-        if path.exists() {
-            let _ = insert_tests_to_db(&path, &connection_pool)
-                .map_err(|err| error!("Insert values to the DB failed due to: {}", err));
-        } else {
-            error!("{} path to the tests isn't valid", path_to_tests);
+        match path.exists() {
+            true => {
+                let _ = insert_tests_to_db(&path, &connection_pool)
+                    .map_err(|err| error!("Insert values to the DB failed due to: {}", err));
+            }
+            false => error!("{} path to the tests isn't valid", path_to_tests),
         }
     }
 

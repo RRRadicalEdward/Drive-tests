@@ -50,7 +50,7 @@ pub async fn sing_up(user: Json<UserForm>, pool: Data<DbPool>) -> Result<HttpRes
             "The [{} {}] user already present in the DB",
             user.name, user.second_name
         );
-        return Ok(HttpResponse::AlreadyReported().finish());
+        return Ok(HttpResponse::Conflict().finish());
     }
 
     let user_clone = user.clone();
