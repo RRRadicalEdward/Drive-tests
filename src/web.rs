@@ -33,7 +33,7 @@ pub async fn sing_up(user: Json<UserForm>, pool: Data<DbPool>) -> Result<HttpRes
     let user = user.into_inner();
     info!(
         "There is a new user:[name - {}, second name - {}]",
-        user.name, user.name
+        user.name, user.second_name
     );
 
     let user_clone = user.clone();

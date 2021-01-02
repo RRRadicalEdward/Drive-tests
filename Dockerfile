@@ -12,22 +12,27 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 FROM rust:latest AS builder
 WORKDIR app
-RUN cargo target add x86_64-unknown-linux-musl
 COPY --from=cacher /app/target target
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
 COPY . .
-RUN cargo build --release --target x86_64-unknown-linux-musl --bin driving-tests-site
+ENV OPENSSL_STATIC 1
+RUN cargo build --release --bin driving-tests-site
 
 FROM debian:buster-slim AS runtime
 WORKDIR app
 RUN apt-get update -y \
-    && apt-get install --no-install-recommends pkg-config openssl libssl-dev ca-certificates apt-utils sqlite libsqlite3-dev -y \
+    && apt-get install --no-install-recommends pkg-config openssl libssl-dev ca-certificates sqlite libsqlite3-dev -y \
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
-ENV OPENSSL_STATIC 1
-ENV RUST_LOG TRACE
+COPY --from=builder /app/drive_tests_db.db .
+COPY --from=builder /app/cert/ .
+COPY --from=builder /app/rsa-keys/ .
+COPY --from=builder /app/target/release/driving-tests-site .
+ENV RUST_LOG DEBUG
 ENV SERVER_IP_ADDR 0.0.0.0:5050
-ENV CERT_DIR /app/cert/
+ENV DATABASE_URL /app/drive_tests_db.db
+ENV CERT_DIR /app/
+ENV KEYS_DIR /app/
 EXPOSE 5050
-ENTRYPOINT ["./app/target/x86_64-unknown-linux-musl/release/driving-tests-site"]
+ENTRYPOINT ["./driving-tests-site"]

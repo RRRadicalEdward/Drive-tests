@@ -24,7 +24,7 @@ use std::{
 
 pub mod model;
 pub mod schema;
-
+use crate::utils;
 use model::{Test, TestForm, UserForm};
 use schema::{tests, users};
 
@@ -60,7 +60,10 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCu
 }
 
 pub fn establish_connection() -> DbPool {
-    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| DEFAULT_DATABASE_URL.to_string());
+    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
+        env::set_var("DATABASE_URL", DEFAULT_DATABASE_URL);
+        DEFAULT_DATABASE_URL.to_string()
+    });
 
     let manager = ConnectionManager::<SqliteConnection>::new(database_url);
 
@@ -113,7 +116,9 @@ pub fn check_if_user_exists(user: UserForm, pool: Data<DbPool>) -> anyhow::Resul
 fn encrypt_password(password: String) -> anyhow::Result<String> {
     let mut rng = OsRng;
 
-    let mut public_key_file = File::open("public-key.pem")?;
+    let (public_key_path, _) = utils::get_keys_paths()?;
+
+    let mut public_key_file = File::open(public_key_path)?;
     let mut buffer = String::new();
     public_key_file.read_to_string(&mut buffer)?;
 
@@ -135,7 +140,8 @@ fn decrypt_password(encrypted_password_hex: String) -> anyhow::Result<String> {
 
     hex::decode_to_slice(encrypted_password_hex, &mut encrypted_password)?;
 
-    let mut private_key_file = File::open("private-key.pem")?;
+    let (_, private_key_path) = utils::get_keys_paths()?;
+    let mut private_key_file = File::open(private_key_path)?;
     let mut buffer = String::new();
     private_key_file.read_to_string(&mut buffer)?;
 
