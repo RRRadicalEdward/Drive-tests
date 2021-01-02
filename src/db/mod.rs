@@ -3,13 +3,12 @@ use diesel::{
     connection::SimpleConnection,
     expression::dsl::exists,
     insert_into,
-    r2d2::{ConnectionManager, CustomizeConnection},
+    r2d2::{ConnectionManager, CustomizeConnection, Pool},
     select,
     sqlite::SqliteConnection,
     BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl,
 };
 use log::{debug, info};
-use r2d2::Pool;
 use rand::rngs::OsRng;
 use rsa::{pem, PaddingScheme, PublicKey, RSAPrivateKey, RSAPublicKey};
 
@@ -61,17 +60,11 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCu
 }
 
 pub fn establish_connection() -> DbPool {
-    let database_url = match env::var("DATABASE_URL") {
-        Ok(database_url) => database_url,
-        Err(_) => {
-            env::set_var("DATABASE_URL", DEFAULT_DATABASE_URL);
-            DEFAULT_DATABASE_URL.to_string()
-        }
-    };
+    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| DEFAULT_DATABASE_URL.to_string());
 
     let manager = ConnectionManager::<SqliteConnection>::new(database_url);
 
-    r2d2::Pool::builder()
+    Pool::builder()
         .max_size(16)
         .connection_customizer(Box::new(ConnectionCustomizer {
             enable_wal: true,
@@ -85,13 +78,6 @@ pub fn establish_connection() -> DbPool {
 pub fn registry_new_user(user: UserForm, pool: Data<DbPool>) -> anyhow::Result<()> {
     use schema::users::dsl::*;
 
-    if check_if_user_exists(user.clone(), pool.clone())? {
-        return Err(anyhow!(format!(
-            "[{} {}] user already exists",
-            user.name, user.second_name
-        )));
-    }
-
     let encrypted_password = encrypt_password(user.password.clone())?;
 
     let db = pool.get().unwrap();
@@ -102,13 +88,14 @@ pub fn registry_new_user(user: UserForm, pool: Data<DbPool>) -> anyhow::Result<(
             password.eq(encrypted_password),
             scores.eq(0),
         ))
-        .execute(db.deref());
+        .execute(db.deref())
+        .map_err(anyhow::Error::from)?;
 
-    match insert_result {
-        Ok(0) => Err(anyhow!("Failed to insert a row to the Users table")),
-        Ok(_) => Ok(()),
-        Err(err) => Err(err.into()),
+    if let 0 = insert_result {
+        return Err(anyhow!("Failed to insert a row to the Users table"));
     }
+
+    Ok(())
 }
 
 pub fn check_if_user_exists(user: UserForm, pool: Data<DbPool>) -> anyhow::Result<bool> {
@@ -174,7 +161,7 @@ pub fn verify_password(user: UserForm, pool: Data<DbPool>) -> anyhow::Result<boo
         .first::<model::User>(db.deref())
         .map_err(|err| {
             anyhow!(
-                "Failed to find in {} {} user in the DB - {}",
+                "Failed to find {} {} user in the DB - {}",
                 user.name,
                 user.second_name,
                 err
@@ -304,7 +291,7 @@ pub fn insert_tests_to_db(path: &Path, db: &DbPool) -> anyhow::Result<()> {
     let db = db.get().unwrap();
 
     for test in tests_vec.into_iter() {
-        match insert_into(tests)
+        let insert_result = insert_into(tests)
             .values(&(
                 description.eq(test.description),
                 answers.eq(test.answers),
@@ -312,10 +299,10 @@ pub fn insert_tests_to_db(path: &Path, db: &DbPool) -> anyhow::Result<()> {
                 image.eq(test.image),
             ))
             .execute(db.deref())
-        {
-            Ok(0) => return Err(anyhow!("Failed to insert a row to the Test table")),
-            Err(err) => return Err(err.into()),
-            Ok(_) => {}
+            .map_err(anyhow::Error::from)?;
+
+        if let 0 = insert_result {
+            return Err(anyhow!("Failed to insert a row to the Test table"));
         }
     }
 

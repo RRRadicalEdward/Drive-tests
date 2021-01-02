@@ -1,7 +1,6 @@
+use crate::db::schema::{tests, users};
 use image::{io::Reader as ImageReader, ImageOutputFormat};
 use serde::{Deserialize, Serialize};
-
-use crate::db::schema::{tests, users};
 
 #[derive(Queryable, Deserialize, Insertable)]
 #[table_name = "users"]

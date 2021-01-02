@@ -11,6 +11,7 @@ use image::EncodableLayout;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use openssl::base64;
 use std::ops::Deref;
 
 use lib::{
@@ -81,7 +82,7 @@ impl TestForm {
 
                 if json_test.image.is_some() {
                     let image_base64 = json_test.image.as_ref().unwrap();
-                    let image_data = base64::decode(image_base64).unwrap();
+                    let image_data = base64::decode_block(image_base64).unwrap();
                     let _ = image::load_from_memory(image_data.as_bytes()).unwrap();
                 }
                 json_test
@@ -210,7 +211,7 @@ async fn log_in_for_not_existing_user() {
 
     let response = call_service(&mut app, request).await;
 
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
 #[actix_rt::test]
@@ -342,11 +343,11 @@ async fn check_answer_with_a_user_save_new_scores_correctly_for_a_passed_test() 
     let correct_answer_id = get_correct_answer_id_from_test_id(test_from.id);
 
     let answer_with_user = AnswerWithUserForm {
-        user: user.clone(),
         answer: AnswerForm {
             test_id: test_from.id as u32,
             answer_id: correct_answer_id,
         },
+        user: user.clone(),
     };
 
     let request = TestRequest::post()

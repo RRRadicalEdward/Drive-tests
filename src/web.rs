@@ -5,6 +5,7 @@ use actix_web::{
 };
 use image::EncodableLayout;
 use log::{debug, error, info};
+use openssl::base64;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -23,8 +24,8 @@ pub struct AnswerForm {
 
 #[derive(Deserialize, Serialize)]
 pub struct AnswerWithUserForm {
-    pub user: UserForm,
     pub answer: AnswerForm,
+    pub user: UserForm,
 }
 
 #[post("/user")]
@@ -36,11 +37,28 @@ pub async fn sing_up(user: Json<UserForm>, pool: Data<DbPool>) -> Result<HttpRes
     );
 
     let user_clone = user.clone();
-    block(move || db::registry_new_user(user_clone, pool)) // TODO: return the user already exist if the user already exist in the DB
+    let pool_clone = pool.clone();
+    let check_passed = block(move || db::check_if_user_exists(user_clone, pool_clone))
+        .await
+        .map_err(|err| {
+            error!("{}:{} Checking if a user exists error - {:?}", file!(), line!(), err);
+            HttpResponse::InternalServerError().finish()
+        })?;
+
+    if check_passed {
+        debug!(
+            "The [{} {}] user already present in the DB",
+            user.name, user.second_name
+        );
+        return Ok(HttpResponse::AlreadyReported().finish());
+    }
+
+    let user_clone = user.clone();
+    block(move || db::registry_new_user(user_clone, pool))
         .await
         .map_err(|err| {
             error!(
-                "{}:{} An error occurred while registering a new user - {}",
+                "{}:{} An error occurred while registering a new user - {:?}",
                 file!(),
                 line!(),
                 err
@@ -74,13 +92,13 @@ pub async fn sing_in(user: Json<UserForm>, pool: Data<DbPool>) -> Result<HttpRes
     let check_passed = block(move || db::check_if_user_exists(user_clone, pool_clone))
         .await
         .map_err(|err| {
-            error!("{}:{} Checking if a user exists error - {}", file!(), line!(), err);
+            error!("{}:{} Checking if a user exists error - {:?}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish()
         })?;
 
     if !check_passed {
         debug!("The user doesn't present in the DB");
-        return Ok(HttpResponse::NotFound().finish());
+        return Ok(HttpResponse::BadRequest().finish());
     }
 
     debug!("The {} {} user exists in the DB", user.name, user.second_name);
@@ -89,7 +107,7 @@ pub async fn sing_in(user: Json<UserForm>, pool: Data<DbPool>) -> Result<HttpRes
     let verify_password_passed = block(move || db::verify_password(user_clone, pool_clone))
         .await
         .map_err(|err| {
-            error!("{}:{} Verifying an user password failed - {}", file!(), line!(), err);
+            error!("{}:{} Verifying an user password failed - {:?}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish()
         })?;
 
@@ -105,7 +123,7 @@ pub async fn sing_in(user: Json<UserForm>, pool: Data<DbPool>) -> Result<HttpRes
         .await
         .map_err(|err| {
             error!(
-                "{}:{} An error occurred while getting a user scores - {}",
+                "{}:{} An error occurred while getting a user scores - {:?}",
                 file!(),
                 line!(),
                 err
@@ -127,13 +145,13 @@ pub async fn sing_in(user: Json<UserForm>, pool: Data<DbPool>) -> Result<HttpRes
 #[get("/test")]
 pub async fn get_test(pool: Data<DbPool>) -> Result<HttpResponse> {
     let test = block(move || db::get_test(pool)).await.map_err(|err| {
-        error!("{}:{} Getting a test failed - {}", file!(), line!(), err);
+        error!("{}:{} Getting a test failed - {:?}", file!(), line!(), err);
         HttpResponse::InternalServerError().finish()
     })?;
 
     let mut image = None;
     if test.image.is_some() {
-        let image_base64 = base64::encode(test.image.unwrap().as_bytes());
+        let image_base64 = base64::encode_block(test.image.unwrap().as_bytes());
         image = Some(image_base64);
     }
 
@@ -155,7 +173,7 @@ pub async fn check_answer(query_data: Query<AnswerForm>, pool: Data<DbPool>) -> 
     let check_result = block(move || db::check_test_answer(test_id, answer_id, &pool))
         .await
         .map_err(|err| {
-            error!("{}:{} Checking a test answer failed - {}", file!(), line!(), err);
+            error!("{}:{} Checking a test answer failed - {:?}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish();
         })?;
 
@@ -184,12 +202,12 @@ pub async fn check_answer_with_user(user_data: Json<AnswerWithUserForm>, pool: D
     let check_passed = block(move || db::check_if_user_exists(user_clone, pool_clone))
         .await
         .map_err(|err| {
-            error!("{}:{} Checking if a user exists error - {}", file!(), line!(), err);
+            error!("{}:{} Checking if a user exists error - {:?}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish();
         })?;
 
     if !check_passed {
-        return Ok(HttpResponse::NotFound().finish());
+        return Ok(HttpResponse::BadRequest().finish());
     }
 
     let user_clone = user.clone();
@@ -197,19 +215,19 @@ pub async fn check_answer_with_user(user_data: Json<AnswerWithUserForm>, pool: D
     let verify_passed = block(move || db::verify_password(user_clone, pool_clone))
         .await
         .map_err(|err| {
-            error!("{}:{} Verifying an user password failed - {}", file!(), line!(), err);
+            error!("{}:{} Verifying an user password failed - {:?}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish();
         })?;
 
     if !verify_passed {
-        return Ok(HttpResponse::NotFound().finish());
+        return Ok(HttpResponse::Forbidden().finish());
     }
 
     let pool_clone = pool.clone();
     let check_result = block(move || db::check_test_answer(test_id, answer_id, &pool_clone))
         .await
         .map_err(|err| {
-            error!("{}:{} Checking a test answer failed - {}", file!(), line!(), err);
+            error!("{}:{} Checking a test answer failed - {:?}", file!(), line!(), err);
             HttpResponse::InternalServerError().finish();
         })?;
 
@@ -221,7 +239,7 @@ pub async fn check_answer_with_user(user_data: Json<AnswerWithUserForm>, pool: D
             block(move || db::add_scores(&user_clone, SCORES_FOR_RIGHT_ANSWER, &pool_clone))
                 .await
                 .map_err(|err| {
-                    error!("{}:{} Failed to add new scores - {}", file!(), line!(), err);
+                    error!("{}:{} Failed to add new scores - {:?}", file!(), line!(), err);
                     HttpResponse::InternalServerError().finish();
                 })?;
 
@@ -240,7 +258,7 @@ pub async fn check_answer_with_user(user_data: Json<AnswerWithUserForm>, pool: D
 }
 
 #[get("/healthy")]
-pub async fn healthy() -> Result<HttpResponse> {
+pub async fn healthy() -> HttpResponse {
     let response = "Drive-tests is working and healthy".to_string();
-    Ok(HttpResponse::Ok().content_type("application/json").json(response))
+    HttpResponse::Ok().content_type("application/json").json(response)
 }
