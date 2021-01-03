@@ -1,3 +1,4 @@
+use actix_cors::Cors;
 use actix_web::{
     http,
     middleware::{self, Logger},
@@ -22,7 +23,6 @@ async fn main() -> anyhow::Result<()> {
     info!("Running server on {}", server_addr);
 
     let connection_pool = establish_connection();
-
     if env::args().nth(1).is_some() {
         let path_to_tests = env::args().nth(1).unwrap();
         let path = Path::new(path_to_tests.as_str());
@@ -45,6 +45,7 @@ async fn main() -> anyhow::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            .wrap(Cors::permissive())
             .wrap(Logger::new("%a %t %r %b %s %T"))
             .wrap(middleware::Compress::new(http::ContentEncoding::Identity))
             .data(connection_pool.clone())

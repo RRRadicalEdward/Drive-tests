@@ -14,11 +14,11 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = "1.0.33"
 actix-web = { version = "3.2.0", features = [ "openssl" ] }
+actix-cors = "0.5.4"
 diesel = { version = "^1.4", default-features = false, features = [ "sqlite", "r2d2" ] }
 env_logger = "0.8.2"
 hex = "0.4.2"
 image = "0.23.12"
-lazy_static = "1.4.0"
 log = "0.4.11"
 openssl = "^0.10"
 rand = "0.7.3"
@@ -36,3 +36,4 @@ version = "^0.9"
 [dev-dependencies]
 actix-rt = "1.0.0"
 uuid = { version = "0.8.1", features = [ "v4" ] }
+lazy_static = "1.4.0"
