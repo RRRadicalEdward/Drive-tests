@@ -22,6 +22,12 @@
     </svg>
 
     <!--SVG end-->
+    <script>
+         $(function(){
+            $("#includedContent").load("b.html"); 
+        });
+    </script>
+
 
 </head>
     <body>
@@ -37,50 +43,7 @@
                         <li><a href="#menu">О нас</a></li>
                         <li><a href="#contact">Контакты</a></li>
                     </ul>
-                    <div class="register__site">
-                        <button onclick="document.getElementById('id01').style.display='block'" style="width:auto;" class="button__title">Регистрация</button>
-
-                        <div id="id01" class="modal">
-                        
-                        <form class="modal-content animate" action="/action_page.php">
-                            <div class="imgcontainer">
-                            <span onclick="document.getElementById('id01').style.display='none'" class="close" title="Close Modal">×</span>
-                            </div>
-
-                            <div class="container">
-                            <label for="uname"><b>Придумайте Имя:</b></label>
-                            <input type="text" placeholder="Введите Имя" name="uname" required>
-
-                            <label for="email"><b>Ваш e-mail:</b></label>
-                            <input type="text" placeholder="Введите e-mail" name="email" required> 
-
-                            <label for="psw"><b>Придумайте пароль:</b></label>
-                            <input type="password" placeholder="Введите Пароль" name="psw" required>
-
-                            <label for="psw-repeat"><b>Повторите пароль:</b></label>
-                            <input type="password" placeholder="Введите пароль" name="psw-repeat" required>
-
-                            <label>
-                                <input type="checkbox" checked="checked" name="remember" style="margin-bottom:15px">Запомнить меня
-                            </label>
-                           
-                            <button type="submit">Зарегестрироваться</button>
-                            </div>
-
-                        </form>
-                        </div>
-
-                        <script>
-                        
-                        var modal = document.getElementById('id01');
-
-                        window.onclick = function(event) {
-                            if (event.target == modal) {
-                                modal.style.display = "none";
-                            }
-                        }
-                        </script>
-                    </div>
+                    <a href="/registration/reg.html"> Зарегестрироваться </a>  <script> //TODO add missing good registration button </script>
                 </div>
             </div>
         </div>

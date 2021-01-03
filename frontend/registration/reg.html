@@ -3,49 +3,82 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/registration/reg.css">
+    <script>
+      function registory_user() {
+        let formEl = document.getElementById('registory_user');
 
+        formEl.onsubmit = async function() {
+          alert("on sumbit was presed");
+          let user = JSON.stringify({
+            "name": document.getElementById("name").value,
+            "second_name": document.getElementById("second_name").value,
+            "password": document.getElementById("password").value,
+          });    
+  
+        let response = await fetch('https://127.0.0.1:5050/user', {
+          method: 'POST',
+          headers : {
+            'Content-type': 'application/json; charset=UTF-8'
+          },
+          body: user,
+        });
+
+        
+        if (response.ok) {
+          let result = await response.json(); 
+         // alert(`${result.name} ${result.second_name} ${result.scores}`);
+          // TODO: Закрыть окно регистрации 
+        } else {
+          if (response.status == 409) {
+            alert("Пользователь с такими данными уже существует");
+          } else {
+            alert("Введите данные снова");
+          }
+        }
+      };
+    } 
+
+    </script>
 </head>
 <body>
 
 <button onclick="document.getElementById('id01').style.display='block'" style="width:auto;">Регистрация</button>
 
-<div id="id01" class="modal">
-  
-  <form class="modal-content animate" action="/action_page.php">
+<form class="modal-content animate" id="registory_user">
     <div class="imgcontainer">
       <span onclick="document.getElementById('id01').style.display='none'" class="close" title="Close Modal">×</span>
     </div>
 
     <div class="container">
       <label for="uname"><b>Придумайте Имя:</b></label>
-      <input type="text" placeholder="Введите Имя" name="uname" required>
+      <input type="text" placeholder="Введите Имя" name="uname" id="name" required>
 
-      <label for="email"><b>Ваш e-mail:</b></label>
-      <input type="text" placeholder="Введите e-mail" name="email" required> 
+      <label for="second_name"><b> Фамилия </b></label>
+      <input type="text" placeholder="Введите фамилию" name="second_name" id="second_name" required> 
 
       <label for="psw"><b>Придумайте пароль:</b></label>
-      <input type="password" placeholder="Введите Пароль" name="psw" required>
+      <input type="password" placeholder="Введите Пароль" name="psw" id="password" required>
 
       <label for="psw-repeat"><b>Повторите пароль:</b></label>
-    <input type="password" placeholder="Введите пароль" name="psw-repeat" required>
+      <input type="password" placeholder="Введите пароль" name="psw-repeat"  required>
 
-        
       <button type="submit">Зарегестрироваться</button>
     </div>
-
-  </form>
-</div>
+</form>
 
 <script>
-// Get the modal
-var modal = document.getElementById('id01');
+  // Get the modal
+  var modal = document.getElementById('id01');
 
-// When the user clicks anywhere outside of the modal, close it
-window.onclick = function(event) {
-    if (event.target == modal) {
-        modal.style.display = "none";
-    }
-}
+  // When the user clicks anywhere outside of the modal, close it
+  window.onclick = function(event) {
+      if (event.target == modal) {
+          modal.style.display = "none";
+      }
+  }
+  
+  registory_user();
+
 </script>
 
 </body>
