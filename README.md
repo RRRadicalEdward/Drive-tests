@@ -28,7 +28,7 @@ curl -X POST 'https://localhost:5050/user' \
 ```
 
 - Response 
-  - 200 Ok
+  - 201 Created
     ```
     {
         "name": string,
@@ -36,6 +36,8 @@ curl -X POST 'https://localhost:5050/user' \
         "scores": 0
     }
     ```
+   - 409 Conflict - the user account already exists
+   - 500 Internal Server Error - something bad happened on the server side, try to do the request again
 
 ### `GET /user` - returns data for the user
 ```bash
@@ -56,8 +58,8 @@ curl -X GET 'https://localhost:5050/user' \
         "scores": int
     }
     ```
+    - 400 BadRequest - the user doesn't exists
     - 403 Forbidden - bad password
-    - 404 Not Found - the user doesn't exists
     - 500 Internal Server Error - something bad happened on the server side, try to do the request again
     
 ### `GET /test` - returns a random test
@@ -128,8 +130,8 @@ curl -X POST 'https://localhost:5050/check_test' \
 	    "scores": int,
     }
     ```
+    - 400 BadRequest - the user doesn't exists
     - 403 Forbidden - bad password
-    - 404 Not Found - the user doesn't exists
     - 500 Internal Server Error - something bad happened on the server side, try to do the request again
 
 ### `GET /healthy` - testing request to check if server is running
